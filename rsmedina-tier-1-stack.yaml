@@ -1,0 +1,338 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The CloudFormation template for VPC-related resources.
+# Metadata:
+
+Parameters:
+  # Shared Parameters
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: DEV
+
+  # VPC Parameters
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 192.168.0.0/16
+  PublicSubnetCIDR:
+    Description: Please enter the IP range (CIDR notation) for the Public Subnet
+    Type: String
+    Default: 192.168.0.0/17
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the first Private Subnet
+    Type: String
+    Default: 192.168.128.0/19
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the second Private Subnet
+    Type: String
+    Default: 192.168.160.0/19
+  DatabaseSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the first Database Subnet
+    Type: String
+    Default: 192.168.192.0/19
+  DatabaseSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the second Database Subnet
+    Type: String
+    Default: 192.168.224.0/19
+
+  # Elastic Beanstalk Parameters
+
+# Mappings:
+
+# Conditions:
+
+Resources:
+# VPC resources
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-vpc
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-ig
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PublicSubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-public-subnet
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  Private1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-private-subnet-1
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  Private2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      VpcId: !Ref VPC
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-private-subnet-2
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  Database1Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      VpcId: !Ref VPC
+      CidrBlock: !Ref DatabaseSubnet1CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-database-subnet-1
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  Database2Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      VpcId: !Ref VPC
+      CidrBlock: !Ref DatabaseSubnet2CIDR
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-database-subnet-2
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  NatGatewayEIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayEIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-nat-gateway
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-public-rt
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-private-rt
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Private1Subnet
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Private2Subnet
+      RouteTableId: !Ref PrivateRouteTable
+  DatabaseSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Database1Subnet
+      RouteTableId: !Ref PrivateRouteTable
+  DatabaseSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Database2Subnet
+      RouteTableId: !Ref PrivateRouteTable
+
+# S3
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: !Sub tier-${ChallengeTier}-bucket
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+# Elastic Beanstalk
+  # ExpressApplication:
+  #   Type: AWS::ElasticBeanstalk::Application
+  #   Properties:
+  #     ApplicationName: !Sub tier-${ChallengeTier}-application
+  #     Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
+
+  # ExpressApplicationVersion:
+  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
+  #   Properties:
+  #     ApplicationName: !Ref ExpressApplication
+  #     SourceBundle:
+  #       S3Bucket: !Ref S3Bucket
+  #       S3Key: express-miniapp.zip
+  
+  # ExpressConfigurationTemplate:
+  #   Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+  #   Properties:
+  #     ApplicationName: !Ref ExpressApplication
+  #     Description: String
+  #     EnvironmentId: String
+  #     OptionSettings:
+  #       - ConfigurationOptionSetting
+  #     PlatformArn: String
+  #     SolutionStackName: String
+  #     SourceConfiguration:
+  #       SourceConfiguration
+
+# Code Build
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts: #required
+        Type: CODEPIPELINE 
+      BuildBatchConfig:
+        ProjectBuildBatchConfig
+      Cache:
+        ProjectCache
+      ConcurrentBuildLimit: 3
+      Description: !Sub The CodeBuild Project for Tier ${ChallengeTier} Application
+      EncryptionKey: String
+      Environment: #required
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
+      FileSystemLocations:
+        - ProjectFileSystemLocation
+      LogsConfig:
+        LogsConfig
+      Name: String
+      QueuedTimeoutInMinutes: Integer
+      ServiceRole: String #required
+      Source: #required
+        Source
+      SourceVersion: String
+      Tags:
+        - Tag
+      TimeoutInMinutes: Integer
+      Triggers:
+        ProjectTriggers
+      VpcConfig:
+        VpcConfig
+
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet ]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref Private1Subnet, !Ref Private2Subnet ]]
+
+  DatabaseSubnets:
+    Description: A list of the database subnets
+    Value: !Join [ ",", [ !Ref Database1Subnet, !Ref Database2Subnet ]]
+
+  PublicSubnet:
+    Description: A reference to the public subnet
+    Value: !Ref PublicSubnet
+
+  Private1Subnet:
+    Description: A reference to the first private subnet
+    Value: !Ref Private1Subnet
+
+  Private2Subnet:
+    Description: A reference to the second private subnet
+    Value: !Ref Private2Subnet
+
+  Database1Subnet:
+    Description: A reference to the first database subnet
+    Value: !Ref Database1Subnet
+
+  Database2Subnet:
+    Description: A reference to the second database subnet
+    Value: !Ref Database2Subnet
+  
+  S3Bucket:
+    Description: A reference to the S3 Bucket for the Elastic Beanstalk application
+    Value: !Ref S3Bucket
