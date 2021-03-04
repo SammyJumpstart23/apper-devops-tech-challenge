@@ -39,14 +39,12 @@ Parameters:
     Type: String
     Default: 192.168.224.0/19
 
-  # Elastic Beanstalk Parameters
-
 # Mappings:
 
 # Conditions:
 
 Resources:
-# VPC resources
+  # VPC resources
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -80,7 +78,7 @@ Resources:
   PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [0, !GetAZs ""]
       VpcId: !Ref VPC
       CidrBlock: !Ref PublicSubnetCIDR
       Tags:
@@ -93,7 +91,7 @@ Resources:
   Private1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [0, !GetAZs ""]
       VpcId: !Ref VPC
       CidrBlock: !Ref PrivateSubnet1CIDR
       Tags:
@@ -106,7 +104,7 @@ Resources:
   Private2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      AvailabilityZone: !Select [1, !GetAZs ""]
       VpcId: !Ref VPC
       CidrBlock: !Ref PrivateSubnet2CIDR
       Tags:
@@ -119,7 +117,7 @@ Resources:
   Database1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      AvailabilityZone: !Select [0, !GetAZs ""]
       VpcId: !Ref VPC
       CidrBlock: !Ref DatabaseSubnet1CIDR
       Tags:
@@ -132,7 +130,7 @@ Resources:
   Database2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      AvailabilityZone: !Select [1, !GetAZs ""]
       VpcId: !Ref VPC
       CidrBlock: !Ref DatabaseSubnet2CIDR
       Tags:
@@ -183,7 +181,7 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
-  
+
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -222,19 +220,7 @@ Resources:
       SubnetId: !Ref Database2Subnet
       RouteTableId: !Ref PrivateRouteTable
 
-# S3
-  S3Bucket:
-    Type: AWS::S3::Bucket
-    Properties: 
-      AccessControl: Private
-      BucketName: !Sub tier-${ChallengeTier}-bucket
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
-
-# Elastic Beanstalk
+  # Elastic Beanstalk
   # ExpressApplication:
   #   Type: AWS::ElasticBeanstalk::Application
   #   Properties:
@@ -248,7 +234,7 @@ Resources:
   #     SourceBundle:
   #       S3Bucket: !Ref S3Bucket
   #       S3Key: express-miniapp.zip
-  
+
   # ExpressConfigurationTemplate:
   #   Type: AWS::ElasticBeanstalk::ConfigurationTemplate
   #   Properties:
@@ -262,40 +248,6 @@ Resources:
   #     SourceConfiguration:
   #       SourceConfiguration
 
-# Code Build
-  CodeBuildProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      Artifacts: #required
-        Type: CODEPIPELINE 
-      BuildBatchConfig:
-        ProjectBuildBatchConfig
-      Cache:
-        ProjectCache
-      ConcurrentBuildLimit: 3
-      Description: !Sub The CodeBuild Project for Tier ${ChallengeTier} Application
-      EncryptionKey: String
-      Environment: #required
-        ComputeType: BUILD_GENERAL1_MEDIUM
-        Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
-      FileSystemLocations:
-        - ProjectFileSystemLocation
-      LogsConfig:
-        LogsConfig
-      Name: String
-      QueuedTimeoutInMinutes: Integer
-      ServiceRole: String #required
-      Source: #required
-        Source
-      SourceVersion: String
-      Tags:
-        - Tag
-      TimeoutInMinutes: Integer
-      Triggers:
-        ProjectTriggers
-      VpcConfig:
-        VpcConfig
-
 Outputs:
   VPC:
     Description: A reference to the created VPC
@@ -303,15 +255,15 @@ Outputs:
 
   PublicSubnets:
     Description: A list of the public subnets
-    Value: !Join [ ",", [ !Ref PublicSubnet ]]
+    Value: !Join [",", [!Ref PublicSubnet]]
 
   PrivateSubnets:
     Description: A list of the private subnets
-    Value: !Join [ ",", [ !Ref Private1Subnet, !Ref Private2Subnet ]]
+    Value: !Join [",", [!Ref Private1Subnet, !Ref Private2Subnet]]
 
   DatabaseSubnets:
     Description: A list of the database subnets
-    Value: !Join [ ",", [ !Ref Database1Subnet, !Ref Database2Subnet ]]
+    Value: !Join [",", [!Ref Database1Subnet, !Ref Database2Subnet]]
 
   PublicSubnet:
     Description: A reference to the public subnet
@@ -332,7 +284,3 @@ Outputs:
   Database2Subnet:
     Description: A reference to the second database subnet
     Value: !Ref Database2Subnet
-  
-  S3Bucket:
-    Description: A reference to the S3 Bucket for the Elastic Beanstalk application
-    Value: !Ref S3Bucket

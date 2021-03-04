@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The CloudFormation template for CI/CD resources.
+
+Parameters:
+  # Shared Parameters
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: DEV
+
+# Mappings:
+
+# Conditions:
+
+Resources:
+  ### S3 ###
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub tier-${ChallengeTier}-bucket
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ### IAM ###
+  CICDIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+                - codepipeline.amazonaws.com
+                - codebuild.amazonaws.com
+                - s3.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub tier-${ChallengeTier}-cicd-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "iam:PassRole"
+                Resource: "*"
+                Effect: "Allow"
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - "cloudformation.amazonaws.com"
+                      - "elasticbeanstalk.amazonaws.com"
+                      - "ec2.amazonaws.com"
+                      - "codepipeline.amazonaws.com"
+                      - "codebuild.amazonaws.com"
+                      - "codestar-connections.amazonaws.com"
+                      - "s3.amazonaws.com"
+              - Action:
+                  - "codedeploy:CreateDeployment"
+                  - "codedeploy:GetApplicationRevision"
+                  - "codedeploy:GetDeployment"
+                  - "codedeploy:GetDeploymentConfig"
+                  - "codedeploy:RegisterApplicationRevision"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:DeleteStack"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:DeleteChangeSet"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:SetStackPolicy"
+                  - "cloudformation:ValidateTemplate"
+                  - "iam:PassRole"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "codebuild:BatchGetBuilds"
+                  - "codebuild:StartBuild"
+                  - "codebuild:BatchGetBuildBatches"
+                  - "codebuild:StartBuildBatch"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "codestar-connections:UseConnection"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "s3:*"
+                Resource: !GetAtt S3Bucket.Arn
+                Effect: "Allow"
+      Description: The service role used for CodePipeline
+      RoleName: !Sub tier-${ChallengeTier}-codepipeline-service-role
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ### Code Pipeline ###
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref S3Bucket
+        Type: S3
+      Name: !Sub tier-${ChallengeTier}-pipeline
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt CICDIAMRole.Arn
+      Stages: #required
+        - Name: Pre-Build
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: 1
+              Configuration:
+                Owner: SammyJumpstart23
+                Repo: apper-devops-tech-challenge
+                Branch: !Sub tier-${ChallengeTier}
+                OAuthToken: "{{resolve:secretsmanager:github-token:SecretString:token}}"
+                PollForSourceChanges: false
+              Name: GithubSource
+              OutputArtifacts:
+                - Name: express-miniapp
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
+                PrimarySource: express-miniapp
+              Name: Build-Node
+              InputArtifacts:
+                - Name: express-miniapp
+              OutputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+      Tags:
+        - Key: Name
+          Value: !Sub tier-${ChallengeTier}-codepipeline
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  CodePipelineGithubWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Authentication: GITHUB_HMAC #required
+      AuthenticationConfiguration: #required
+        SecretToken: "{{resolve:secretsmanager:github-token:SecretString:token}}"
+      Filters: #required
+        - JsonPath: "$.ref"
+          MatchEquals: refs/heads/{Branch}
+      Name: !Sub tier-${ChallengeTier}-pipeline-webhook
+      RegisterWithThirdParty: true
+      TargetAction: GithubSource #required
+      TargetPipeline: !Ref CodePipeline #required
+      TargetPipelineVersion: 1 #required
+
+  ### Code Build ###
+  CodeBuildProjectBuildExpressMiniapp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts: #required
+        Type: CodePipeline
+      Cache:
+        Type: S3
+        Location: !Ref S3Bucket
+      ConcurrentBuildLimit: 3
+      Description: The CodeBuild project for building the express-miniapp project
+      Environment: #required
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
+        Type: LINUX_CONTAINER
+      Name: !Sub tier-${ChallengeTier}-codebuild-build-express-miniapp
+      QueuedTimeoutInMinutes: 5
+      ServiceRole: !GetAtt CICDIAMRole.Arn #required
+      Source: #required
+        Type: CODEPIPELINE
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+      TimeoutInMinutes: 5
+Outputs:
+  S3Bucket:
+    Description: A reference to the S3 Bucket for the Elastic Beanstalk application
+    Value: !Ref S3Bucket
+  CodePipeline:
+    Description: A reference to the CodePipeline
+    Value: !Ref CodePipeline
