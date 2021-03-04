@@ -220,34 +220,6 @@ Resources:
       SubnetId: !Ref Database2Subnet
       RouteTableId: !Ref PrivateRouteTable
 
-  # Elastic Beanstalk
-  # ExpressApplication:
-  #   Type: AWS::ElasticBeanstalk::Application
-  #   Properties:
-  #     ApplicationName: !Sub tier-${ChallengeTier}-application
-  #     Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
-
-  # ExpressApplicationVersion:
-  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
-  #   Properties:
-  #     ApplicationName: !Ref ExpressApplication
-  #     SourceBundle:
-  #       S3Bucket: !Ref S3Bucket
-  #       S3Key: express-miniapp.zip
-
-  # ExpressConfigurationTemplate:
-  #   Type: AWS::ElasticBeanstalk::ConfigurationTemplate
-  #   Properties:
-  #     ApplicationName: !Ref ExpressApplication
-  #     Description: String
-  #     EnvironmentId: String
-  #     OptionSettings:
-  #       - ConfigurationOptionSetting
-  #     PlatformArn: String
-  #     SolutionStackName: String
-  #     SourceConfiguration:
-  #       SourceConfiguration
-
 Outputs:
   VPC:
     Description: A reference to the created VPC
