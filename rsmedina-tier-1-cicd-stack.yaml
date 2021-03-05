@@ -11,6 +11,10 @@ Parameters:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
     Default: DEV
+  AWSMainAccountNumber:
+    Description: Please enter the AWS account number for this stack
+    Type: String
+    Default: 485323199507
 
 # Mappings:
 
@@ -21,13 +25,32 @@ Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
-      AccessControl: PublicReadWrite
-      BucketName: !Sub tier-${ChallengeTier}-bucket
+      AccessControl: Private
+      BucketName: !Sub tier-${ChallengeTier}-cicd
+      VersioningConfiguration:
+        Status: Enabled
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket #required
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal: "*"
+            Action: "s3:*"
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref S3Bucket, /* ] ]
+            Condition:
+              StringLike:
+                "aws:userId":
+                  - !Join [ ":", [ !GetAtt CodePipelineIAMRole.RoleId, "*" ] ]
+                  - !Join [ ":", [ !GetAtt CodeBuildIAMRole.RoleId, "*" ] ]
+                  - !Ref AWSMainAccountNumber
 
   ### IAM ###
   CodePipelineIAMRole:
@@ -172,7 +195,7 @@ Resources:
         Type: CODEPIPELINE
       Cache:
         Type: S3
-        Location: !Ref S3Bucket
+        Location: !Join [ "/", [ !Ref S3Bucket, "cache" ] ]
       ConcurrentBuildLimit: 3
       Description: The CodeBuild project for building the express-miniapp project
       Environment: #required
@@ -234,6 +257,21 @@ Resources:
               OutputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ElasticBeanstalk
+                Version: 1
+              Configuration:
+                
+              Name: Build-Node
+              InputArtifacts:
+                - Name: express-miniapp
+              OutputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
       Tags:
         - Key: Name
           Value: !Sub tier-${ChallengeTier}-codepipeline
@@ -241,6 +279,34 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+
+  # Elastic Beanstalk
+  ExpressApplication:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Sub tier-${ChallengeTier}-application
+      Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
+
+  ExpressApplicationVersion:
+    Type: AWS::ElasticBeanstalk::ApplicationVersion
+    Properties:
+      ApplicationName: !Ref ExpressApplication
+      SourceBundle:
+        S3Bucket: !Ref S3Bucket
+        S3Key: express-miniapp.zip
+
+  ExpressConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref ExpressApplication
+      Description: AWS Elastic Beanstalk Application Configuration
+      EnvironmentId: String
+      OptionSettings:
+        - ConfigurationOptionSetting
+      PlatformArn: String
+      SolutionStackName: String
+      SourceConfiguration:
+        SourceConfiguration
 
 Outputs:
   S3Bucket:

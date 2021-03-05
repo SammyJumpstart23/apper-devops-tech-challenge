@@ -37,7 +37,7 @@ Resources:
     Type: AWS::ElasticBeanstalk::ConfigurationTemplate
     Properties:
       ApplicationName: !Ref ExpressApplication
-      Description: String
+      Description: AWS Elastic Beanstalk Application Configuration
       EnvironmentId: String
       OptionSettings:
         - ConfigurationOptionSetting
