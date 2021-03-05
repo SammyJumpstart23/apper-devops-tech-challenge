@@ -8,27 +8,23 @@ phases:
   install:
     runtime-versions:
       nodejs: latest
-  pre_build:
-    commands:
-      - echo Installing source NPM dependencies...
-      - ls
-      - cd express-minapp
-      - npm install
   build:
     commands:
       - echo Build started on `date`
+      - echo Installing source NPM dependencies...
+      - cd express-minapp
+      - npm install
       - echo Compiling the Node.js code
-      - npm run build
   post_build:
     commands:
       - echo Build completed on `date`
 
 artifacts:
   files:
-    - src/index.js
-    - src/middlewares.js
-    - package.json
-    - node_modules/**/*
+    - express-minapp/src/index.js
+    - express-minapp/src/middlewares.js
+    - express-minapp/package.json
+    - express-minapp/node_modules/**/*
 
 cache:
   paths:
