@@ -1,0 +1,33 @@
+version: 0.2
+
+env:
+  variables:
+    S3_BUCKET: "tier-1-bucket"
+
+phases:
+  pre_build:
+    runtime-versions:
+      nodejs: 15
+    commands:
+      - echo Installing source NPM dependencies...
+      - cd express-miniapp
+      - npm install
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Compiling the Node.js code
+      - npm run build
+  post_build:
+    commands:
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - src/index.js
+    - src/middlewares.js
+    - package.json
+    - node_modules/**/*
+
+cache:
+  paths:
+    - node_modules/**/*
