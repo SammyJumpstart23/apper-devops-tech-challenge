@@ -6,11 +6,12 @@ env:
 
 phases:
   install:
-    runtime-version:
-      nodejs: 15
+    runtime-versions:
+      nodejs: latest
   pre_build:
     commands:
       - echo Installing source NPM dependencies...
+      - ls
       - cd express-miniapp
       - npm install
   build:
