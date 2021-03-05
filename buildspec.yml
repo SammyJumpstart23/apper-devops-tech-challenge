@@ -5,9 +5,10 @@ env:
     S3_BUCKET: "tier-1-bucket"
 
 phases:
-  pre_build:
-    runtime-versions:
+  install:
+    runtime-version:
       nodejs: 15
+  pre_build:
     commands:
       - echo Installing source NPM dependencies...
       - cd express-miniapp
