@@ -15,7 +15,7 @@ Parameters:
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
-    Default: DEV
+    Default: STG
   
   ###### DB Parameters ######
   DBInstanceClass:
@@ -31,7 +31,7 @@ Parameters:
   VPCStack:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
-    Default: "rsmedina-tier-1-vpc-stack"
+    Default: "rsmedina-tier-1-stg-vpc-stack"
 
 # Mappings: 
 
@@ -43,7 +43,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: "Master DB Credentials"
-      Name: !Sub tier-${ChallengeTier}-master-db-credentials
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db-credentials
       GenerateSecretString:
         SecretStringTemplate: '{"username": "admin"}'
         GenerateStringKey: 'password'
@@ -71,7 +71,7 @@ Resources:
       AutoMinorVersionUpgrade: True
       BackupRetentionPeriod: 30
       DBInstanceClass: !Ref DBInstanceClass
-      DBInstanceIdentifier: !Sub tier-${ChallengeTier}-master-db
+      DBInstanceIdentifier: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db
       DBName: !Sub tier${ChallengeTier}table
       VPCSecurityGroups:
         - !GetAtt MasterDBSecurityGroup.GroupId
@@ -96,7 +96,7 @@ Resources:
   MasterDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBSubnetGroupName: !Sub tier-${ChallengeTier}-master-db-subnet-group
+      DBSubnetGroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db-subnet-group
       DBSubnetGroupDescription: "Master DB Subnet Group"
       SubnetIds:
         - Fn::ImportValue:
@@ -112,12 +112,14 @@ Resources:
   MasterDBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub tier-${ChallengeTier}-db-sg
+      GroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-db-sg
       GroupDescription: "Master DB Security Group"
       VpcId:
         Fn::ImportValue:
           !Sub "${VPCStack}:VPC"
       Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-db-sg
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV

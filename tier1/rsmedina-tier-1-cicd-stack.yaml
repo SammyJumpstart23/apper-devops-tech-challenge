@@ -14,17 +14,22 @@ Parameters:
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
-    Default: DEV
+    Default: CICD
   AWSMainAccountNumber:
     Description: Please enter the AWS account number for this stack
     Type: String
     Default: 485323199507
   
   ###### Stack Parameters #######
-  EBStack:
+  EBSTGStack:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
-    Default: "rsmedina-tier-1-eb-stack"
+    Default: "rsmedina-tier-1-stg-eb-stack"
+
+  EBPRODStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-prod-eb-stack"
 
 # Mappings:
 
@@ -36,7 +41,7 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       AccessControl: Private
-      BucketName: !Sub tier-${ChallengeTier}-cicd
+      BucketName: !Sub ${ProjectName}-tier-${ChallengeTier}-cicd
       VersioningConfiguration:
         Status: Enabled
       Tags:
@@ -78,7 +83,7 @@ Resources:
             Action:
               - "sts:AssumeRole"
       Policies:
-        - PolicyName: !Sub tier-${ChallengeTier}-codepipeline-policy
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline-policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -139,7 +144,12 @@ Resources:
                     - ""
                     - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
                       - Fn::ImportValue:
-                          !Sub ${EBStack}:ExpressApplication
+                          !Sub "${EBSTGStack}:ExpressApplication"
+                  - Fn::Join:
+                    - ""
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                      - Fn::ImportValue:
+                          !Sub "${EBPRODStack}:ExpressApplication"
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:applicationversion/*/*"
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:configurationtemplate/*/*"
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:environment/*/*"
@@ -149,7 +159,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
       Description: The service role used for CodePipeline
-      RoleName: !Sub tier-${ChallengeTier}-codepipeline-service-role
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline-service-role
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -171,7 +181,7 @@ Resources:
             Action:
               - "sts:AssumeRole"
       Policies:
-        - PolicyName: !Sub tier-${ChallengeTier}-codebuild-policy
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-policy
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -201,7 +211,7 @@ Resources:
                 Resource: !Ref CodePipelineGithubConnection
                 Effect: "Allow"
       Description: The service role used for CodeBuild
-      RoleName: !Sub tier-${ChallengeTier}-codebuild-service-role
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-service-role
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -212,7 +222,7 @@ Resources:
   CodePipelineGithubConnection:
     Type: AWS::CodeStarConnections::Connection
     Properties:
-      ConnectionName: !Sub tier-${ChallengeTier}-github-connection 
+      ConnectionName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-github 
       ProviderType: GitHub
       Tags:
         - Key: TIER
@@ -235,7 +245,7 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
         Type: LINUX_CONTAINER
-      Name: !Sub tier-${ChallengeTier}-codebuild-build-express-miniapp
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-build-express-miniapp
       QueuedTimeoutInMinutes: 5
       ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
       Source: 
@@ -254,7 +264,7 @@ Resources:
       ArtifactStore:
         Location: !Ref S3Bucket
         Type: S3
-      Name: !Sub tier-${ChallengeTier}-pipeline
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-pipeline
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineIAMRole.Arn
       Stages: 
@@ -290,7 +300,7 @@ Resources:
               OutputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
-        - Name: Deploy
+        - Name: Deploy-Staging
           Actions:
             - ActionTypeId:
                 Category: Deploy
@@ -300,17 +310,46 @@ Resources:
               Configuration:
                 ApplicationName:
                   Fn::ImportValue:
-                    !Sub ${EBStack}:ExpressApplication
+                    !Sub ${EBSTGStack}:ExpressApplication
                 EnvironmentName:
                   Fn::ImportValue:
-                    !Sub ${EBStack}:ExpressApplicationEnvironment
+                    !Sub ${EBSTGStack}:ExpressApplicationEnvironment
+              Name: Deploy-Node
+              InputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+            - ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                ExternalEntityLink: 
+                  Fn::ImportValue:
+                    !Sub ${EBSTGStack}:ExpressApplicationEndpoint
+              Name: Test-Approve
+              RunOrder: 2
+        - Name: Deploy-Production
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ElasticBeanstalk
+                Version: 1
+              Configuration:
+                ApplicationName:
+                  Fn::ImportValue:
+                    !Sub ${EBPRODStack}:ExpressApplication
+                EnvironmentName:
+                  Fn::ImportValue:
+                    !Sub ${EBPRODStack}:ExpressApplicationEnvironment
               Name: Deploy-Node
               InputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-codepipeline
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV

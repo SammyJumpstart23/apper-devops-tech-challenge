@@ -15,7 +15,7 @@ Parameters:
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
-    Default: DEV
+    Default: STG
 
   ###### VPC Parameters ######
   VpcCIDR:
@@ -61,7 +61,7 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-vpc
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-vpc
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -72,7 +72,7 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-ig
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-ig
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -91,7 +91,7 @@ Resources:
       CidrBlock: !Ref PublicSubnet1CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-public-subnet-1
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-public-subnet-1
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -104,7 +104,7 @@ Resources:
       CidrBlock: !Ref PublicSubnet2CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-public-subnet-2
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-public-subnet-2
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -117,7 +117,7 @@ Resources:
       CidrBlock: !Ref PrivateSubnet1CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-private-subnet-1
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-private-subnet-1
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -130,7 +130,7 @@ Resources:
       CidrBlock: !Ref PrivateSubnet2CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-private-subnet-2
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-private-subnet-2
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -143,7 +143,7 @@ Resources:
       CidrBlock: !Ref DatabaseSubnet1CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-database-subnet-1
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-database-subnet-1
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -156,7 +156,7 @@ Resources:
       CidrBlock: !Ref DatabaseSubnet2CIDR
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-database-subnet-2
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-database-subnet-2
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -174,7 +174,7 @@ Resources:
       SubnetId: !Ref Public1Subnet
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-nat-gateway-1
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-nat-gateway-1
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -192,7 +192,7 @@ Resources:
       SubnetId: !Ref Public2Subnet
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-nat-gateway-2
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-nat-gateway-2
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -204,7 +204,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-public-rt
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-public-rt
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -233,7 +233,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-private-rt
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-private-rt
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -244,7 +244,7 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub tier-${ChallengeTier}-private-rt
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-private-rt
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
