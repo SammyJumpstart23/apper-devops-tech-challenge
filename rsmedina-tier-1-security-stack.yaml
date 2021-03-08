@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - Elastic Beanstalk
+# Metadata: 
+
+Parameters: 
+  ###### Shared Parameters ######
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: DEV
+  
+  ###### Stack Parameters ######
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-vpc-stack"
+
+  EBStack:
+    Description: Please enter the stack name of the CICD resources for import
+    Type: String
+    Default: "rsmedina-tier-1-eb-stack"
+
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  MasterDBSGIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: String
+      CidrIpv6: String
+      Description: String
+      FromPort: Integer
+      GroupId: String
+      GroupName: String
+      IpProtocol: String #required
+      SourcePrefixListId: String
+      SourceSecurityGroupId: String
+      SourceSecurityGroupName: String
+      SourceSecurityGroupOwnerId: String
+      ToPort: Integer
+
+# Outputs:

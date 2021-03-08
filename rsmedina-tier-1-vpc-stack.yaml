@@ -3,7 +3,11 @@ Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 -
 # Metadata:
 
 Parameters:
-  # Shared Parameters
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
@@ -13,7 +17,7 @@ Parameters:
     Type: String
     Default: DEV
 
-  # VPC Parameters
+  ###### VPC Parameters ######
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String

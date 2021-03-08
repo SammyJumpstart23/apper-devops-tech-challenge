@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - Elastic Beanstalk
+# Metadata: 
+
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: DEV
+
+  ###### ELB Parameters ######
+  ExpressApplicationSolutionStackName:
+    Description: Please enter the solution stack to use for Elastic Beanstalk
+    Type: String
+    Default: "64bit Amazon Linux 2 v5.3.0 running Node.js 14"
+  ExpressApplicationDefaultAppPort:
+    Description: Please enter the default port of the tech challenge application
+    Type: String
+    Default: 1337
+  ExpressApplicationInstanceType:
+    Description: Please enter the instance type to use for the Elastic Beanstalk application
+    Type: String
+    Default: "t3.micro"
+
+  ###### Stack Parameters #######
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-vpc-stack"
+  RDSStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-rds-stack"
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  ###### Elastic Beanstalk ######
+  ExpressApplication:
+    Type: AWS::ElasticBeanstalk::Application
+    Properties:
+      ApplicationName: !Sub tier-${ChallengeTier}-application
+      Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
+
+  # ExpressApplicationVersion:
+  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
+  #   Properties:
+  #     ApplicationName: !Ref ExpressApplication
+  #     SourceBundle:
+  #       S3Bucket: !Ref S3Bucket
+  #       S3Key: express-miniapp.zip
+
+  ExpressApplicationConfigurationTemplate:
+    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+    Properties:
+      ApplicationName: !Ref ExpressApplication
+      Description: AWS Elastic Beanstalk Application Configuration
+      OptionSettings:
+        ### Elastic Beanstalk Configuration ###
+        - Namespace: "aws:elasticbeanstalk:environment"
+          OptionName: EnvironmentType
+          Value: "LoadBalanced"
+        - Namespace: "aws:elasticbeanstalk:environment"
+          OptionName: LoadBalancerType
+          Value: "application"
+        - Namespace: "aws:elasticbeanstalk:environment:process:default"
+          OptionName: Port
+          Value: !Ref ExpressApplicationDefaultAppPort
+        - Namespace: "aws:elasticbeanstalk:application"
+          OptionName: "Application Healthcheck URL"
+          Value: !Sub "HTTP:${ExpressApplicationDefaultAppPort}/"
+
+        ### AutoScaling Group Configuration ###
+        - Namespace: "aws:autoscaling:asg"
+          OptionName: MinSize
+          Value: "2"
+        - Namespace: "aws:autoscaling:asg"
+          OptionName: MaxSize
+          Value: "6"
+        - Namespace: "aws:autoscaling:launchconfiguration"
+          OptionName: IamInstanceProfile
+          Value: !Ref ExpressApplicationInstanceProfile
+        - Namespace: "aws:autoscaling:launchconfiguration"
+          OptionName: SecurityGroups
+          Value: !Ref ExpressApplicationSecurityGroup
+        - Namespace: "aws:autoscaling:updatepolicy:rollingupdate"
+          OptionName: RollingUpdateEnabled
+          Value: true
+
+        ### EC2 and VPC Configuration ###
+        - Namespace: "aws:ec2:instances"
+          OptionName: InstanceTypes
+          Value: !Ref ExpressApplicationInstanceType
+        - Namespace: "aws:ec2:vpc"
+          OptionName: "VPCId"
+          Value:
+            Fn::ImportValue:
+              !Sub "${VPCStack}:VPC"
+        - Namespace: "aws:ec2:vpc"
+          OptionName: "Subnets"
+          Value:
+            Fn::ImportValue:
+              !Sub "${VPCStack}:PrivateSubnets"
+        - Namespace: "aws:ec2:vpc"
+          OptionName: "ELBSubnets"
+          Value:
+            Fn::ImportValue:
+              !Sub "${VPCStack}:PublicSubnets"
+       
+        ### Load Balancer Configuration ###
+        - Namespace: "aws:elbv2:listenerrule:default"
+          OptionName: PathPatterns
+          Value: "/**/*"
+        - Namespace: "aws:elbv2:listener:default"
+          OptionName: Rules
+          Value: "default"
+        - Namespace: "aws:elbv2:loadbalancer"
+          OptionName: SecurityGroups
+          Value: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
+        - Namespace: "aws:elbv2:loadbalancer"
+          OptionName: ManagedSecurityGroup
+          Value: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
+        
+        ### Environment Properties ###
+        - Namespace: "aws:elasticbeanstalk:application:environment"
+          OptionName: PORT
+          Value: !Ref ExpressApplicationDefaultAppPort
+        - Namespace: "aws:elasticbeanstalk:application:environment"
+          OptionName: HOST
+          Value:
+            Fn::Join:
+              - ":"
+              - - "{{resolve"
+                - "secretsmanager"
+                - Fn::ImportValue:
+                    !Sub "${RDSStack}:MasterDBInfo"
+                - "SecretString"
+                - "host}}"
+        - Namespace: "aws:elasticbeanstalk:application:environment"
+          OptionName: USERNAME
+          Value:
+            Fn::Join:
+              - ":"
+              - - "{{resolve"
+                - "secretsmanager"
+                - Fn::ImportValue:
+                    !Sub "${RDSStack}:MasterDBInfo"
+                - "SecretString"
+                - "username}}"
+        - Namespace: "aws:elasticbeanstalk:application:environment"
+          OptionName: PASSWORD
+          Value:
+            Fn::Join:
+              - ":"
+              - - "{{resolve"
+                - "secretsmanager"
+                - Fn::ImportValue:
+                    !Sub "${RDSStack}:MasterDBInfo"
+                - "SecretString"
+                - "password}}"
+        - Namespace: "aws:elasticbeanstalk:application:environment"
+          OptionName: DATABASE
+          Value:
+            Fn::Join:
+              - ":"
+              - - "{{resolve"
+                - "secretsmanager"
+                - Fn::ImportValue:
+                    !Sub "${RDSStack}:MasterDBInfo"
+                - "SecretString"
+                - "dbname}}"
+      SolutionStackName: !Ref ExpressApplicationSolutionStackName
+
+  ExpressApplicationEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    Properties:
+      ApplicationName: !Ref ExpressApplication
+      CNAMEPrefix: !Sub rsmedina-tier${ChallengeTier}
+      Description: AWS Elastic Beanstalk Environment
+      EnvironmentName: !Sub tier-${ChallengeTier}-application-environment
+      TemplateName: !Ref ExpressApplicationConfigurationTemplate
+      # VersionLabel: !Ref ExpressApplicationVersion
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### IAM (ElasticBeanstalk) ######
+  ExpressApplicationInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - sts:AssumeRole
+      Description: AWS Elastic Beanstalk Role
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
+        - arn:aws:iam::aws:policy/AWSElasticBeanstalkCustomPlatformforEC2Role
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  
+  ExpressApplicationInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub tier-${ChallengeTier}-application-instance-role
+      Roles: 
+        - !Ref ExpressApplicationInstanceRole
+
+  ###### Security Groups (ElasticBeanstalk) ######
+  ExpressApplicationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub tier-${ChallengeTier}-application-sg
+      GroupDescription: !Join [ "", [ "Security Group for ", !Ref ExpressApplication ]]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
+          Description: !Sub "Allows access to port ${ExpressApplicationDefaultAppPort} of the Apper DevOps Tech Challenge application"
+          FromPort: !Ref ExpressApplicationDefaultAppPort
+          ToPort: !Ref ExpressApplicationDefaultAppPort
+          IpProtocol: tcp
+        - SourceSecurityGroupId:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBSecurityGroup"
+          Description: Allows access to the master DB instance
+          FromPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          ToPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          IpProtocol: tcp
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ExpressApplicationLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub tier-${ChallengeTier}-application-elb-sg
+      GroupDescription: !Join [ "", [ "Security Group for the ELB of ", !Ref ExpressApplication ]]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allows public access to over port 80 to the Apper DevOps Tech Challenge application
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ExpressApplicationDBIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBSecurityGroup"
+      Description: "Allows access to and from the master DB instance"
+      SourceSecurityGroupId: !GetAtt ExpressApplicationSecurityGroup.GroupId
+      FromPort:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBPortAddress"
+      ToPort:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBPortAddress"
+      IpProtocol: tcp
+
+Outputs:
+  ExpressApplication:
+    Description: References the Elastic Beanstalk Express Application
+    Value: !Ref ExpressApplication
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressApplication" ] ]
+  
+  ExpressApplicationEnvironment:
+    Description: References the Elastic Beanstalk Express Application Environment
+    Value: !Ref ExpressApplicationEnvironment
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressApplicationEnvironment" ] ]

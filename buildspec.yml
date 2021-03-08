@@ -21,12 +21,13 @@ phases:
 
 artifacts:
   files:
-    - express-minapp/src/index.js
-    - express-minapp/src/middlewares.js
-    - express-minapp/package.json
-    - express-minapp/node_modules/**/*
-    - express-minapp/Procfile
-  discard-paths: yes
+    - src/index.js
+    - src/middlewares.js
+    - package.json
+    - node_modules/**/*
+    - Procfile
+  name: express-minapp
+  base-directory: express-minapp
 
 cache:
   paths:

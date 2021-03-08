@@ -3,6 +3,10 @@ Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 -
 
 Parameters:
   ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
@@ -15,25 +19,12 @@ Parameters:
     Description: Please enter the AWS account number for this stack
     Type: String
     Default: 485323199507
-  ExpressApplicationSolutionStackName:
-    Description: Please enter the solution stack to use for Elastic Beanstalk
-    Type: String
-    Default: "64bit Amazon Linux 2 v5.3.0 running Node.js 14"
-  VPCStack:
+  
+  ###### Stack Parameters #######
+  EBStack:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
-    Default: "rsmedina-tier-1-vpc-stack"
-  DefaultAppPort:
-    Description: Please enter the default port of the tech challenge application
-    Type: String
-    Default: "1337"
-  ExpressApplicationInstanceType:
-    Description: Please enter the instance type to use for the Elastic Beanstalk application
-    Type: String
-    Default: "t3.micro"
-  
-  ###### Database Parameters #######
-
+    Default: "rsmedina-tier-1-eb-stack"
 
 # Mappings:
 
@@ -56,7 +47,7 @@ Resources:
   S3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref S3Bucket #required
+      Bucket: !Ref S3Bucket 
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -144,7 +135,11 @@ Resources:
               - Action:
                   - "elasticbeanstalk:*"
                 Resource:
-                  - !Join [ "", [ !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/", !Ref ExpressApplication ] ]
+                  - Fn::Join:
+                    - ""
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                      - Fn::ImportValue:
+                          !Sub ${EBStack}:ExpressApplication
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:applicationversion/*/*"
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:configurationtemplate/*/*"
                   - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:environment/*/*"
@@ -217,7 +212,7 @@ Resources:
   CodePipelineGithubConnection:
     Type: AWS::CodeStarConnections::Connection
     Properties:
-      ConnectionName: !Sub tier-${ChallengeTier}-github-connection #required
+      ConnectionName: !Sub tier-${ChallengeTier}-github-connection 
       ProviderType: GitHub
       Tags:
         - Key: TIER
@@ -229,21 +224,21 @@ Resources:
   CodeBuildProjectBuildExpressMiniapp:
     Type: AWS::CodeBuild::Project
     Properties:
-      Artifacts: #required
+      Artifacts: 
         Type: CODEPIPELINE
       Cache:
         Type: S3
         Location: !Join [ "/", [ !Ref S3Bucket, "cache" ] ]
       ConcurrentBuildLimit: 3
       Description: The CodeBuild project for building the express-miniapp project
-      Environment: #required
+      Environment: 
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
         Type: LINUX_CONTAINER
       Name: !Sub tier-${ChallengeTier}-codebuild-build-express-miniapp
       QueuedTimeoutInMinutes: 5
-      ServiceRole: !GetAtt CodeBuildIAMRole.Arn #required
-      Source: #required
+      ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
+      Source: 
         Type: CODEPIPELINE
       Tags:
         - Key: TIER
@@ -262,7 +257,7 @@ Resources:
       Name: !Sub tier-${ChallengeTier}-pipeline
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineIAMRole.Arn
-      Stages: #required
+      Stages: 
         - Name: Pre-Build
           Actions:
             - ActionTypeId:
@@ -275,7 +270,7 @@ Resources:
                 FullRepositoryId: SammyJumpstart23/apper-devops-tech-challenge
                 BranchName: !Sub tier-${ChallengeTier}
                 OutputArtifactFormat: CODEBUILD_CLONE_REF
-              Name: GithubSource
+              Name: Source-GitHub
               OutputArtifacts:
                 - Name: express-miniapp
               RunOrder: 1
@@ -303,8 +298,12 @@ Resources:
                 Provider: ElasticBeanstalk
                 Version: 1
               Configuration:
-                ApplicationName: !Ref ExpressApplication
-                EnvironmentName: !Ref ExpressApplicationEnvironment
+                ApplicationName:
+                  Fn::ImportValue:
+                    !Sub ${EBStack}:ExpressApplication
+                EnvironmentName:
+                  Fn::ImportValue:
+                    !Sub ${EBStack}:ExpressApplicationEnvironment
               Name: Deploy-Node
               InputArtifacts:
                 - Name: built-express-miniapp
@@ -317,195 +316,7 @@ Resources:
         - Key: ENV
           Value: !Ref Environment
 
-  ###### Elastic Beanstalk ######
-  ExpressApplication:
-    Type: AWS::ElasticBeanstalk::Application
-    Properties:
-      ApplicationName: !Sub tier-${ChallengeTier}-application
-      Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
-
-  # ExpressApplicationVersion:
-  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
-  #   Properties:
-  #     ApplicationName: !Ref ExpressApplication
-  #     SourceBundle:
-  #       S3Bucket: !Ref S3Bucket
-  #       S3Key: express-miniapp.zip
-
-  ExpressApplicationConfigurationTemplate:
-    Type: AWS::ElasticBeanstalk::ConfigurationTemplate
-    Properties:
-      ApplicationName: !Ref ExpressApplication
-      Description: AWS Elastic Beanstalk Application Configuration
-      OptionSettings:
-        - Namespace: "aws:autoscaling:asg"
-          OptionName: MinSize
-          Value: "2"
-        - Namespace: "aws:autoscaling:asg"
-          OptionName: MaxSize
-          Value: "6"
-        - Namespace: "aws:elasticbeanstalk:environment"
-          OptionName: EnvironmentType
-          Value: "LoadBalanced"
-        - Namespace: "aws:elasticbeanstalk:environment"
-          OptionName: LoadBalancerType
-          Value: "application"
-        - Namespace: "aws:elasticbeanstalk:environment:process:default"
-          OptionName: Port
-          Value: !Ref DefaultAppPort
-        - Namespace: "aws:autoscaling:launchconfiguration"
-          OptionName: IamInstanceProfile
-          Value: !Ref ExpressApplicationInstanceProfile
-        - Namespace: "aws:autoscaling:launchconfiguration"
-          OptionName: SecurityGroups
-          Value: !Ref ExpressApplicationSecurityGroup
-        - Namespace: "aws:ec2:instances"
-          OptionName: InstanceTypes
-          Value: !Ref ExpressApplicationInstanceType
-        - Namespace: "aws:ec2:vpc"
-          OptionName: "VPCId"
-          Value:
-            Fn::ImportValue:
-              !Sub "${VPCStack}:VPC"
-        - Namespace: "aws:ec2:vpc"
-          OptionName: "Subnets"
-          Value:
-            Fn::ImportValue:
-              !Sub "${VPCStack}:PrivateSubnets"
-        - Namespace: "aws:ec2:vpc"
-          OptionName: "ELBSubnets"
-          Value:
-            Fn::ImportValue:
-              !Sub "${VPCStack}:PublicSubnets"
-        - Namespace: "aws:elasticbeanstalk:application"
-          OptionName: "Application Healthcheck URL"
-          Value: "HTTP:1337/"
-        ###### TODO: Elastic Beanstalk Database Configuration ######
-        # - Namespace: "aws:ec2:vpc"
-        #   OptionName: DBSubnets
-        #   Value:
-        #     - Fn::ImportValue:
-        #         !Sub "${VPCStack}:DatabaseSubnets"
-        # - Namespace: "aws:elasticbeanstalk:application:environment"
-        #   OptionName: HOST
-        #   Value: String
-        # - Namespace: "aws:elasticbeanstalk:application:environment"
-        #   OptionName: USERNAME
-        #   Value: String
-        # - Namespace: "aws:elasticbeanstalk:application:environment"
-        #   OptionName: PASSWORD
-        #   Value: String
-        # - Namespace: "aws:elasticbeanstalk:application:environment"
-        #   OptionName: DATABASE
-        #   Value: String
-        - Namespace: "aws:elbv2:listenerrule:default"
-          OptionName: PathPatterns
-          Value: "/**/*"
-        - Namespace: "aws:elbv2:listener:1337"
-          OptionName: Protocol
-          Value: "HTTP"
-        - Namespace: "aws:elbv2:listener:1337"
-          OptionName: Rules
-          Value: "default"
-        - Namespace: "aws:elbv2:loadbalancer"
-          OptionName: SecurityGroups
-          Value: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
-        - Namespace: "aws:elbv2:loadbalancer"
-          OptionName: ManagedSecurityGroup
-          Value: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
-      SolutionStackName: !Ref ExpressApplicationSolutionStackName
-
-  ExpressApplicationEnvironment:
-    Type: AWS::ElasticBeanstalk::Environment
-    Properties:
-      ApplicationName: !Ref ExpressApplication
-      CNAMEPrefix: !Sub rsmedina-tier${ChallengeTier}
-      Description: AWS Elastic Beanstalk Environment
-      EnvironmentName: !Sub tier-${ChallengeTier}-application-environment
-      TemplateName: !Ref ExpressApplicationConfigurationTemplate
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
-      # VersionLabel: !Ref ExpressApplicationVersion
-
-  ###### IAM (ElasticBeanstalk) ######
-  ExpressApplicationInstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - "ec2.amazonaws.com"
-            Action:
-              - sts:AssumeRole
-      Description: AWS Elastic Beanstalk Role
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
-        - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
-        - arn:aws:iam::aws:policy/AWSElasticBeanstalkCustomPlatformforEC2Role
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
-  
-  ExpressApplicationInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      InstanceProfileName: !Sub tier-${ChallengeTier}-application-instance-role
-      Roles: #required
-        - !Ref ExpressApplicationInstanceRole
-
-  ###### Security Groups (ElasticBeanstalk) ######
-  ExpressApplicationSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub tier-${ChallengeTier}-application-sg
-      GroupDescription: !Join [ "", [ "Security Group for ", !Ref ExpressApplication ]]
-      VpcId:
-        Fn::ImportValue:
-          !Sub "${VPCStack}:VPC"
-      SecurityGroupIngress:
-        - SourceSecurityGroupId: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
-          Description: Allows access to port 1337 of the Apper DevOps Tech Challenge application
-          FromPort: !Ref DefaultAppPort
-          ToPort: !Ref DefaultAppPort
-          IpProtocol: tcp
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
-
-  ExpressApplicationLoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupName: !Sub tier-${ChallengeTier}-application-elb-sg
-      GroupDescription: !Join [ "", [ "Security Group for the ELB of ", !Ref ExpressApplication ]]
-      VpcId:
-        Fn::ImportValue:
-          !Sub "${VPCStack}:VPC"
-      SecurityGroupIngress:
-        - CidrIp: 0.0.0.0/0
-          Description: Allows public access to port 1337 of the Apper DevOps Tech Challenge application
-          FromPort: !Ref DefaultAppPort
-          ToPort: !Ref DefaultAppPort
-          IpProtocol: tcp
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
-
 Outputs:
-  S3Bucket:
-    Description: A reference to the S3 Bucket for the Elastic Beanstalk application
-    Value: !Ref S3Bucket
   CodePipeline:
-    Description: A reference to the CodePipeline
+    Description: A reference to the CodePipeline used for CI/CD
     Value: !Ref CodePipeline
