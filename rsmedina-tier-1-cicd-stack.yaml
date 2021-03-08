@@ -18,19 +18,19 @@ Parameters:
   ExpressApplicationSolutionStackName:
     Description: Please enter the solution stack to use for Elastic Beanstalk
     Type: String
-    Default: 64bit Amazon Linux 2 v5.3.0 running Node.js 14
+    Default: "64bit Amazon Linux 2 v5.3.0 running Node.js 14"
   VPCStack:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
-    Default: rsmedina-tier-1-vpc-stack
+    Default: "rsmedina-tier-1-vpc-stack"
   DefaultAppPort:
     Description: Please enter the default port of the tech challenge application
     Type: String
-    Default: 1337
+    Default: "1337"
   ExpressApplicationInstanceType:
     Description: Please enter the instance type to use for the Elastic Beanstalk application
     Type: String
-    Default: t3.micro
+    Default: "t3.micro"
   
   ###### Database Parameters #######
 
@@ -141,6 +141,18 @@ Resources:
                   - "s3:*"
                 Resource: !GetAtt S3Bucket.Arn
                 Effect: "Allow"
+              - Action:
+                  - "elasticbeanstalk:*"
+                Resource:
+                  - !Join [ "", [ !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/", !Ref ExpressApplication ] ]
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:applicationversion/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:configurationtemplate/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:environment/*/*"
+                  - "arn:aws:elasticbeanstalk:::platform/*"
+                  - "arn:aws:elasticbeanstalk:::solutionstack/*"
+                Effect: "Allow"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
       Description: The service role used for CodePipeline
       RoleName: !Sub tier-${ChallengeTier}-codepipeline-service-role
       Tags:
@@ -193,6 +205,13 @@ Resources:
                   - "codestar-connections:UseConnection"
                 Resource: !Ref CodePipelineGithubConnection
                 Effect: "Allow"
+      Description: The service role used for CodeBuild
+      RoleName: !Sub tier-${ChallengeTier}-codebuild-service-role
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
 
   ###### CodeStar Connection ######
   CodePipelineGithubConnection:
@@ -286,7 +305,7 @@ Resources:
               Configuration:
                 ApplicationName: !Ref ExpressApplication
                 EnvironmentName: !Ref ExpressApplicationEnvironment
-              Name: Build-Node
+              Name: Deploy-Node
               InputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
@@ -318,50 +337,49 @@ Resources:
     Properties:
       ApplicationName: !Ref ExpressApplication
       Description: AWS Elastic Beanstalk Application Configuration
-      EnvironmentId: String
       OptionSettings:
         - Namespace: "aws:autoscaling:asg"
           OptionName: MinSize
-          Value: 2
+          Value: "2"
         - Namespace: "aws:autoscaling:asg"
           OptionName: MaxSize
-          Value: 6
+          Value: "6"
         - Namespace: "aws:elasticbeanstalk:environment"
           OptionName: EnvironmentType
-          Value: LoadBalanced
+          Value: "LoadBalanced"
         - Namespace: "aws:elasticbeanstalk:environment"
           OptionName: LoadBalancerType
-          Value: application
+          Value: "application"
         - Namespace: "aws:elasticbeanstalk:environment:process:default"
           OptionName: Port
           Value: !Ref DefaultAppPort
-        - Namespace: "aws:autoscaling:configuration"
+        - Namespace: "aws:autoscaling:launchconfiguration"
           OptionName: IamInstanceProfile
           Value: !Ref ExpressApplicationInstanceProfile
-        - Namespace: "aws:autoscaling:configuration"
+        - Namespace: "aws:autoscaling:launchconfiguration"
           OptionName: SecurityGroups
           Value: !Ref ExpressApplicationSecurityGroup
         - Namespace: "aws:ec2:instances"
           OptionName: InstanceTypes
           Value: !Ref ExpressApplicationInstanceType
         - Namespace: "aws:ec2:vpc"
-          OptionName: VPCId
+          OptionName: "VPCId"
           Value:
-            - Fn::ImportValue:
-                !Sub "${VPCStack}:VPC"
+            Fn::ImportValue:
+              !Sub "${VPCStack}:VPC"
         - Namespace: "aws:ec2:vpc"
-          OptionName: Subnets
+          OptionName: "Subnets"
           Value:
-            - Fn::ImportValue:
-                !Sub "${VPCStack}:PrivateSubnets"
+            Fn::ImportValue:
+              !Sub "${VPCStack}:PrivateSubnets"
         - Namespace: "aws:ec2:vpc"
-          OptionName: ELBSubnets
+          OptionName: "ELBSubnets"
           Value:
-            - Fn::ImportValue:
-                !Sub "${VPCStack}:PublicSubnets"
+            Fn::ImportValue:
+              !Sub "${VPCStack}:PublicSubnets"
         - Namespace: "aws:elasticbeanstalk:application"
-          OptionName: ELBSubnets
-          Value: !Sub HTTP:1337/
+          OptionName: "Application Healthcheck URL"
+          Value: "HTTP:1337/"
         ###### TODO: Elastic Beanstalk Database Configuration ######
         # - Namespace: "aws:ec2:vpc"
         #   OptionName: DBSubnets
@@ -382,13 +400,13 @@ Resources:
         #   Value: String
         - Namespace: "aws:elbv2:listenerrule:default"
           OptionName: PathPatterns
-          Value: /**/*
+          Value: "/**/*"
         - Namespace: "aws:elbv2:listener:1337"
           OptionName: Protocol
-          Value: HTTP
+          Value: "HTTP"
         - Namespace: "aws:elbv2:listener:1337"
           OptionName: Rules
-          Value: HTTP
+          Value: "default"
         - Namespace: "aws:elbv2:loadbalancer"
           OptionName: SecurityGroups
           Value: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
@@ -456,6 +474,7 @@ Resources:
         - SourceSecurityGroupId: !GetAtt ExpressApplicationLoadBalancerSecurityGroup.GroupId
           Description: Allows access to port 1337 of the Apper DevOps Tech Challenge application
           FromPort: !Ref DefaultAppPort
+          ToPort: !Ref DefaultAppPort
           IpProtocol: tcp
       Tags:
         - Key: TIER
@@ -475,6 +494,7 @@ Resources:
         - CidrIp: 0.0.0.0/0
           Description: Allows public access to port 1337 of the Apper DevOps Tech Challenge application
           FromPort: !Ref DefaultAppPort
+          ToPort: !Ref DefaultAppPort
           IpProtocol: tcp
       Tags:
         - Key: TIER

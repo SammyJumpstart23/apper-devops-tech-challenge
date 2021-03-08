@@ -25,6 +25,7 @@ artifacts:
     - express-minapp/src/middlewares.js
     - express-minapp/package.json
     - express-minapp/node_modules/**/*
+  discard-paths: yes
 
 cache:
   paths:
