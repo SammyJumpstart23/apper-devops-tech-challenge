@@ -13,7 +13,6 @@ Welcome to the repository for my submission to the Apper DevOps Engineer Technic
 ## For Submission
 
 Tier1:
-Tier1:
-- rsmedina-devops-challenge
-- https://github.com/SammyJumpstart23/rsmedina-devops-challenge
-- 0c95125511454e11d2bfd3652b62b11e97b32a44
+- Repo Name: rsmedina-devops-challenge
+- Repo Link: https://github.com/SammyJumpstart23/rsmedina-devops-challenge
+- Commit Hash: 0c95125511454e11d2bfd3652b62b11e97b32a44
