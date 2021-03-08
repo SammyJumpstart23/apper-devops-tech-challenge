@@ -6,6 +6,14 @@ Welcome to the repository for my submission to the Apper DevOps Engineer Technic
 
 | Tier Level |   Status   | Date Started | Date Finished |
 | ---------- | ---------- | ------------ | ------------- |
-|      1     |      ONGOING      |      03/03/2021      |      -      |
+|      1     |      COMPLETE      |      03/03/2021      |      03/08/2021      |
 |      2     |      BACKLOG      |          -           |      -      |
 |      3     |      BACKLOG      |          -           |      -      |
+
+## For Submission
+
+Tier1:
+Tier1:
+- rsmedina-devops-challenge
+- https://github.com/SammyJumpstart23/rsmedina-devops-challenge
+- 0c95125511454e11d2bfd3652b62b11e97b32a44
