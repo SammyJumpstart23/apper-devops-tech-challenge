@@ -1,0 +1,361 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - CI/CD
+
+Parameters:
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: CICD
+  AWSMainAccountNumber:
+    Description: Please enter the AWS account number for this stack
+    Type: String
+    Default: 485323199507
+  
+  ###### Stack Parameters #######
+  EBSTGStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-stg-eb-stack"
+
+  EBPRODStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-prod-eb-stack"
+
+# Mappings:
+
+# Conditions:
+
+Resources:
+  ###### S3 ######
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Sub ${ProjectName}-tier-${ChallengeTier}-cicd
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket 
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal: "*"
+            Action: "s3:*"
+            Resource: !Join [ "", [ "arn:aws:s3:::", !Ref S3Bucket, /* ] ]
+            Condition:
+              StringLike:
+                "aws:userId":
+                  - !Join [ ":", [ !GetAtt CodePipelineIAMRole.RoleId, "*" ] ]
+                  - !Join [ ":", [ !GetAtt CodeBuildIAMRole.RoleId, "*" ] ]
+                  - !Ref AWSMainAccountNumber
+
+  ###### IAM ######
+  CodePipelineIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - s3.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "iam:PassRole"
+                Resource: "*"
+                Effect: "Allow"
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService:
+                      - "cloudformation.amazonaws.com"
+                      - "ec2.amazonaws.com"
+                      - "codepipeline.amazonaws.com"
+                      - "codebuild.amazonaws.com"
+                      - "codestar-connections.amazonaws.com"
+                      - "s3.amazonaws.com"
+              - Action:
+                  - "codedeploy:CreateDeployment"
+                  - "codedeploy:GetApplicationRevision"
+                  - "codedeploy:GetDeployment"
+                  - "codedeploy:GetDeploymentConfig"
+                  - "codedeploy:RegisterApplicationRevision"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "cloudformation:CreateStack"
+                  - "cloudformation:DeleteStack"
+                  - "cloudformation:DescribeStacks"
+                  - "cloudformation:UpdateStack"
+                  - "cloudformation:CreateChangeSet"
+                  - "cloudformation:DeleteChangeSet"
+                  - "cloudformation:DescribeChangeSet"
+                  - "cloudformation:ExecuteChangeSet"
+                  - "cloudformation:SetStackPolicy"
+                  - "cloudformation:ValidateTemplate"
+                  - "iam:PassRole"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "codebuild:BatchGetBuilds"
+                  - "codebuild:StartBuild"
+                  - "codebuild:BatchGetBuildBatches"
+                  - "codebuild:StartBuildBatch"
+                Resource: !GetAtt CodeBuildProjectBuildExpressMiniapp.Arn
+                Effect: "Allow"
+              - Action:
+                  - "codestar-connections:UseConnection"
+                Resource: !Ref CodePipelineGithubConnection
+                Effect: "Allow"
+              - Action:
+                  - "s3:*"
+                Resource: !GetAtt S3Bucket.Arn
+                Effect: "Allow"
+              - Action:
+                  - "elasticbeanstalk:*"
+                Resource:
+                  - Fn::Join:
+                    - ""
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                      - Fn::ImportValue:
+                          !Sub "${EBSTGStack}:ExpressApplication"
+                  - Fn::Join:
+                    - ""
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                      - Fn::ImportValue:
+                          !Sub "${EBPRODStack}:ExpressApplication"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:applicationversion/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:configurationtemplate/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:environment/*/*"
+                  - "arn:aws:elasticbeanstalk:::platform/*"
+                  - "arn:aws:elasticbeanstalk:::solutionstack/*"
+                Effect: "Allow"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
+      Description: The service role used for CodePipeline
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline-service-role
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  
+  CodeBuildIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+                - s3.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "s3:ListBucket"
+                  - "s3:GetBucketAcl"
+                  - "logs:CreateLogGroup"
+                  - "logs:PutLogEvents"
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "codebuild:CreateReportGroup"
+                  - "codebuild:CreateReport"
+                  - "logs:CreateLogStream"
+                  - "codebuild:UpdateReport"
+                  - "s3:PutObjectVersionAcl"
+                  - "s3:GetBucketLocation"
+                  - "codebuild:BatchPutTestCases"
+                  - "s3:PutObjectAcl"
+                  - "s3:GetObjectVersion"
+                Resource:
+                  - "arn:aws:s3:::*"
+                  - "arn:aws:logs:*:*:log-group:/aws/codebuild/*"
+                  - "arn:aws:codebuild:*"
+                Effect: "Allow"
+              - Action:
+                  - "codestar-connections:UseConnection"
+                Resource: !Ref CodePipelineGithubConnection
+                Effect: "Allow"
+      Description: The service role used for CodeBuild
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-service-role
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### CodeStar Connection ######
+  CodePipelineGithubConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-github 
+      ProviderType: GitHub
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### Code Build ######
+  CodeBuildProjectBuildExpressMiniapp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts: 
+        Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location: !Join [ "/", [ !Ref S3Bucket, "cache" ] ]
+      ConcurrentBuildLimit: 3
+      Description: The CodeBuild project for building the express-miniapp project
+      Environment: 
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
+        Type: LINUX_CONTAINER
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-build-express-miniapp
+      QueuedTimeoutInMinutes: 5
+      ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
+      Source: 
+        Type: CODEPIPELINE
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+      TimeoutInMinutes: 5
+
+  ###### Code Pipeline ######
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref S3Bucket
+        Type: S3
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-pipeline
+      RestartExecutionOnUpdate: true
+      RoleArn: !GetAtt CodePipelineIAMRole.Arn
+      Stages: 
+        - Name: Pre-Build
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: 1
+              Configuration:
+                ConnectionArn: !GetAtt CodePipelineGithubConnection.ConnectionArn
+                FullRepositoryId: SammyJumpstart23/apper-devops-tech-challenge
+                BranchName: !Sub tier-${ChallengeTier}
+                OutputArtifactFormat: CODEBUILD_CLONE_REF
+              Name: Source-GitHub
+              OutputArtifacts:
+                - Name: express-miniapp
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
+                PrimarySource: express-miniapp
+              Name: Build-Node
+              InputArtifacts:
+                - Name: express-miniapp
+              OutputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+        - Name: Deploy-Staging
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ElasticBeanstalk
+                Version: 1
+              Configuration:
+                ApplicationName:
+                  Fn::ImportValue:
+                    !Sub ${EBSTGStack}:ExpressApplication
+                EnvironmentName:
+                  Fn::ImportValue:
+                    !Sub ${EBSTGStack}:ExpressApplicationEnvironment
+              Name: Deploy-Node
+              InputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+            - ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                ExternalEntityLink: 
+                  Fn::ImportValue:
+                    !Sub ${EBSTGStack}:ExpressApplicationEndpoint
+              Name: Test-Approve
+              RunOrder: 2
+        - Name: Deploy-Production
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ElasticBeanstalk
+                Version: 1
+              Configuration:
+                ApplicationName:
+                  Fn::ImportValue:
+                    !Sub ${EBPRODStack}:ExpressApplication
+                EnvironmentName:
+                  Fn::ImportValue:
+                    !Sub ${EBPRODStack}:ExpressApplicationEnvironment
+              Name: Deploy-Node
+              InputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+Outputs:
+  CodePipeline:
+    Description: A reference to the CodePipeline used for CI/CD
+    Value: !Ref CodePipeline

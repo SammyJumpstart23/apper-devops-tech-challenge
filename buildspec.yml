@@ -1,0 +1,34 @@
+version: 0.2
+
+env:
+  variables:
+    S3_BUCKET: "tier-1-bucket"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: latest
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Installing source NPM dependencies...
+      - cd express-minapp
+      - npm install
+      - echo Compiling the Node.js code
+  post_build:
+    commands:
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - src/index.js
+    - src/middlewares.js
+    - package.json
+    - node_modules/**/*
+    - Procfile
+  name: express-minapp
+  base-directory: express-minapp
+
+cache:
+  paths:
+    - node_modules/**/*
