@@ -344,6 +344,9 @@ Resources:
         - Namespace: "aws:autoscaling:asg"
           OptionName: MaxSize
           Value: "6"
+        - Namespace: "aws:elasticbeanstalk:container:nodejs"
+          OptionName: NodeVersion
+          Value: "14.16.0"
         - Namespace: "aws:elasticbeanstalk:environment"
           OptionName: EnvironmentType
           Value: "LoadBalanced"
