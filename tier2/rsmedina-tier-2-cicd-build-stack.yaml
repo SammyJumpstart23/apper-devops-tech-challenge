@@ -253,17 +253,11 @@ Resources:
         Type: LINUX_CONTAINER
         PrivilegedMode: true
         EnvironmentVariables:
-          - Name: AWS_DEFAULT_REGION
-            Type: PLAINTEXT
-            Value: !Ref "AWS::Region"
           - Name: AWS_ACCOUNT_ID
-            Type: PLAINTEXT
             Value: !Ref AWSMainAccountNumber
           - Name: IMAGE_TAG
-            Type: PLAINTEXT
             Value: latest
           - Name: IMAGE_REPO_NAME
-            Type: PLAINTEXT
             Value: !Ref ExpressAppRepository
       Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-build-express-miniapp
       QueuedTimeoutInMinutes: 5
