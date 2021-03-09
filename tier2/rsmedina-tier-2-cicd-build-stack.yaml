@@ -10,7 +10,7 @@ Parameters:
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
-    Default: 2
+    Default: "2"
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
@@ -60,7 +60,7 @@ Resources:
   ExpressAppRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: ${ProjectName}-tier-${ChallengeTier}-ecr
+      RepositoryName: !Sub ${ProjectName}-tier-${ChallengeTier}-ecr
       RepositoryPolicyText:
         Version: "2012-10-17"
         Statement:
@@ -214,7 +214,7 @@ Resources:
                   - "ecr:InitiateLayerUpload"
                   - "ecr:PutImage"
                   - "ecr:UploadLayerPart"
-                Resource: !GetAtt ExpressAppRepository.Arn
+                Resource: "*"
                 Effect: "Allow"
       Description: The service role used for CodeBuild
       RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-service-role
@@ -285,7 +285,7 @@ Resources:
       ArtifactStore:
         Location: !Ref S3Bucket
         Type: S3
-      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-pipeline
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-build-pipeline
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineIAMRole.Arn
       Stages: 
@@ -315,7 +315,7 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
                 PrimarySource: express-miniapp
-              Name: Build-Node
+              Name: Build-and-Push
               InputArtifacts:
                 - Name: express-miniapp
               RunOrder: 1
@@ -329,5 +329,5 @@ Resources:
 
 Outputs:
   CodePipeline:
-    Description: A reference to the CodePipeline used for CI/CD
+    Description: A reference to the CodePipeline used for building and pushing the Docker Image to ECR
     Value: !Ref CodePipeline

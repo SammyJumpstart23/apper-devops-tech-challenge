@@ -22,7 +22,7 @@ phases:
       - cd express-minapp
       - echo Building the docker image...
       - docker build --cache-from $CONTAINER_REPOSITORY_URL:$IMAGE_TAG -t $IMAGE_REPO_NAME:$IMAGE_TAG .
-      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG CONTAINER_REPOSITORY_URL:$IMAGE_TAG
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $CONTAINER_REPOSITORY_URL:$IMAGE_TAG
   post_build:
     commands:
       - echo Build completed on `date`
