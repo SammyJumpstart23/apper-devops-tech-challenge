@@ -298,7 +298,7 @@ Resources:
                 Version: 1
               Configuration:
                 ConnectionArn: !GetAtt CodePipelineGithubConnection.ConnectionArn
-                FullRepositoryId: SammyJumpstart23/apper-devops-tech-challenge
+                FullRepositoryId: SammyJumpstart23/rsmedina-devops-challenge
                 BranchName: !Sub tier-${ChallengeTier}
                 OutputArtifactFormat: CODEBUILD_CLONE_REF
               Name: Source-GitHub
