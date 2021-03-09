@@ -309,6 +309,7 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
                 PrimarySource: express-miniapp
+                # EnvironmentVariables: !Sub '[{"name":"AWS_ACCOUNT_ID","value":"${AWSMainAccountNumber}"},{"name":"IMAGE_TAG","value":"latest"},{"name":"IMAGE_REPO_NAME","value":"${ExpressAppRepository}"}]'
               Name: Build-and-Push
               InputArtifacts:
                 - Name: express-miniapp
