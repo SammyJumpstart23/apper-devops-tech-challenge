@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - ECS
+# Metadata: 
+
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 2
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: STG
+
+  ###### ECS Parameters ######
+  ECSInstanceType:
+    Description: Please input the instance type to use for the ECS cluster
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+    ConstraintDescription: Please choose a valid instance type.
+
+  ###### Stack Parameters #######
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-2-stg-vpc-stack"
+
+  RDSStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-2-stg-rds-stack"
+
+# Mappings:
+
+# Conditions:
+
+Resources: 
+  ExpressAppCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      CapacityProviders:
+        - FARGATE
+      ClusterName: ${ProjectName}-tier-${ChallengeTier}-${Environment}-cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+    
+  
+Outputs:

@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  variables:
+    CONTAINER_REPOSITORY_URL: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: latest
+    commands:
+      - nohup /usr/local/bin/dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375 --storage-driver=overlay&
+      - timeout 15 sh -c "until docker info; do echo .; sleep 1; done"
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email)
+      - docker pull $CONTAINER_REPOSITORY_URL:$IMAGE_TAG || true
+  build:
+    commands:
+      - echo Build started on `date`
+      - cd express-minapp
+      - echo Building the docker image...
+      - docker build --cache-from $CONTAINER_REPOSITORY_URL:$IMAGE_TAG -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG CONTAINER_REPOSITORY_URL:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $CONTAINER_REPOSITORY_URL:$IMAGE_TAG

@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - RDS
+# Metadata: 
+
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 2
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: STG
+  
+  ###### DB Parameters ######
+  DBInstanceClass:
+    Description: Please enter the instance class for RDS
+    Type: String
+    Default: "db.t3.micro"
+  DefaultDBPort:
+    Description: Please enter the default port for the DB Instance
+    Type: String
+    Default: "3306"
+
+  ###### Stack Parameters ######
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-2-stg-vpc-stack"
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  ###### Secrets Manager ######
+  MasterDBCredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: "Master DB Credentials"
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db-credentials
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  MasterDBCredentialsTargetAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref MasterDBCredentials
+      TargetId: !Ref MasterDBInstance
+      TargetType: AWS::RDS::DBInstance
+  
+  ###### Database Instance ######
+  MasterDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: 20
+      AllowMajorVersionUpgrade: False
+      AutoMinorVersionUpgrade: True
+      BackupRetentionPeriod: 30
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db
+      DBName: !Sub tier${ChallengeTier}table
+      VPCSecurityGroups:
+        - !GetAtt MasterDBSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref MasterDBSubnetGroup
+      DeleteAutomatedBackups: False
+      DeletionProtection: False
+      Engine: "mysql"
+      EngineVersion: "8.0"
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterDBCredentials}:SecretString:password}}"
+      MasterUsername: !Sub "{{resolve:secretsmanager:${MasterDBCredentials}:SecretString:username}}"
+      MaxAllocatedStorage: 100
+      MultiAZ: true
+      PubliclyAccessible: False
+      StorageType: gp2
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  
+  ###### Database Network ######
+  MasterDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db-subnet-group
+      DBSubnetGroupDescription: "Master DB Subnet Group"
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub "${VPCStack}:Database1Subnet"
+        - Fn::ImportValue:
+            !Sub "${VPCStack}:Database2Subnet"
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  MasterDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-db-sg
+      GroupDescription: "Master DB Security Group"
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-db-sg
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+Outputs:
+  MasterDBName:
+    Description: The name of the master DB instance
+    Value: !Ref MasterDBInstance
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "MasterDBInstance" ] ]
+
+  MasterDBInfo:
+    Description: Information regarding the master DB instance, stored in Secrets Manager
+    Value: !Ref MasterDBCredentials
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "MasterDBInfo" ] ]
+  
+  MasterDBEndpointAddress:
+    Description: The endpoint of the master DB instance
+    Value: !GetAtt MasterDBInstance.Endpoint.Address
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "MasterDBEndpointAddress" ] ]
+
+  MasterDBPortAddress:
+    Description: The port of the master DB instance
+    Value: !GetAtt MasterDBInstance.Endpoint.Port
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "MasterDBPortAddress" ] ]
+
+  MasterDBSecurityGroup:
+    Description: The security group for the master DB instance
+    Value: !GetAtt MasterDBSecurityGroup.GroupId
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "MasterDBSecurityGroup" ] ]
