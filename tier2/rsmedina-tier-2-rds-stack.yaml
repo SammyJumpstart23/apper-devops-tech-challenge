@@ -22,6 +22,12 @@ Parameters:
     Description: Please enter the instance class for RDS
     Type: String
     Default: "db.t3.micro"
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+      - db.t3.large
+    ConstraintDescription: Please choose a valid instance type.
   DefaultDBPort:
     Description: Please enter the default port for the DB Instance
     Type: String

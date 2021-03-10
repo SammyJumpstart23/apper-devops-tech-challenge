@@ -16,6 +16,10 @@ Parameters:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
     Default: STG
+  AWSMainAccountNumber:
+    Description: Please enter the AWS account number for this stack
+    Type: String
+    Default: 485323199507
 
   ###### ECS Parameters ######
   ECSInstanceType:
@@ -35,22 +39,32 @@ Parameters:
     Type: String
     Default: "rsmedina-tier-2-stg-vpc-stack"
 
+  BuildStack:
+    Description: Please enter the stack name of the CI/CD Build pipeline resources for import
+    Type: String
+    Default: "rsmedina-tier-2-cicd-build-stack"
+
   RDSStack:
-    Description: Please enter the stack name of the VPC resources for import
+    Description: Please enter the stack name of the RDS resources for import
     Type: String
     Default: "rsmedina-tier-2-stg-rds-stack"
 
 # Mappings:
 
 # Conditions:
+#   UseCodeDeploy:
+#     Fn::Equals:
+#       - !Ref Environment
+#       - "PROD"
 
 Resources: 
+  ###### Elastic Container Service ######
   ExpressAppCluster:
     Type: AWS::ECS::Cluster
     Properties:
       CapacityProviders:
         - FARGATE
-      ClusterName: ${ProjectName}-tier-${ChallengeTier}-${Environment}-cluster
+      ClusterName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-cluster
       ClusterSettings:
         - Name: containerInsights
           Value: enabled
@@ -59,6 +73,332 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
-    
+
+  ExpressAppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: express-minapp
+          Image:
+            Fn::Join:
+              - ""
+              - - !Ref AWSMainAccountNumber
+                - ".dkr.ecr.ap-southeast-1.amazonaws.com/"
+                - Fn::ImportValue:
+                    !Sub "${BuildStack}:ExpressAppRepository"
+                - ":latest"
+          Environment:
+            - Name: HOST
+              Value:
+                Fn::Join:
+                  - ":"
+                  - - "{{resolve"
+                    - "secretsmanager"
+                    - Fn::ImportValue:
+                        !Sub "${RDSStack}:MasterDBInfo"
+                    - "SecretString"
+                    - "host}}"
+            - Name: USERNAME
+              Value:
+                Fn::Join:
+                  - ":"
+                  - - "{{resolve"
+                    - "secretsmanager"
+                    - Fn::ImportValue:
+                        !Sub "${RDSStack}:MasterDBInfo"
+                    - "SecretString"
+                    - "username}}"
+            - Name: PASSWORD
+              Value:
+                Fn::Join:
+                  - ":"
+                  - - "{{resolve"
+                    - "secretsmanager"
+                    - Fn::ImportValue:
+                        !Sub "${RDSStack}:MasterDBInfo"
+                    - "SecretString"
+                    - "password}}"
+            - Name: DATABASE
+              Value:
+                Fn::Join:
+                  - ":"
+                  - - "{{resolve"
+                    - "secretsmanager"
+                    - Fn::ImportValue:
+                        !Sub "${RDSStack}:MasterDBInfo"
+                    - "SecretString"
+                    - "dbname}}"
+          Cpu: 2
+          Memory: 256
+          MemoryReservation: 128
+          PortMappings:
+            - ContainerPort: 1337
+              HostPort: 1337
+              Protocol: tcp
+      Cpu: 512
+      Memory: 1024
+      ExecutionRoleArn: !GetAtt ExpressAppExecutionRole.Arn
+      Family: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-task-family
+      NetworkMode: "awsvpc"
+      RequiresCompatibilities:
+        - FARGATE
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+      
+  ExpressAppService:
+    Type: AWS::ECS::Service
+    DependsOn: ExpressAppELBDefaultListener
+    Properties:
+      Cluster: !Ref ExpressAppCluster
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      DeploymentController:
+        Type: "ECS"
+      DesiredCount: 2
+      EnableECSManagedTags: true
+      HealthCheckGracePeriodSeconds: 15
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: express-minapp
+          ContainerPort: 1337
+          TargetGroupArn: !Ref ExpressAppELBTargetGroup
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !GetAtt ExpressApplicationECSSecurityGroup.GroupId
+          Subnets:
+            - Fn::ImportValue:
+                !Sub ${VPCStack}:Private1Subnet
+            - Fn::ImportValue:
+                !Sub ${VPCStack}:Private2Subnet
+      PlatformVersion: LATEST
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      ServiceName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-service
+      TaskDefinition: !Ref ExpressAppTaskDefinition
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### IAM Roles ######
+  ExpressAppExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-ecs-task-execution-role
+      Description: IAM Role for Express Application Task Execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Effect: "Allow"
+          Principal:
+            Service:
+              - ecs-tasks.amazonaws.com
+          Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-ecs-task-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:BatchGetImage"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "secretsmanager:GetSecretValue"
+                Resource:
+                  Fn::Join:
+                    - ""
+                    - - Fn::ImportValue:
+                          !Sub ${RDSStack}:MasterDBInfo
+                      - "*"
+                Effect: "Allow"
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### Load Balancer ######
+  ExpressAppELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-elb
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt ExpressApplicationELBSecurityGroup.GroupId
+      Subnets:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Public1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Public2Subnet
+      Type: application
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
   
+  ExpressAppELBDefaultListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Port: 443
+            Protocol: HTTPS
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_301"
+      LoadBalancerArn: !Ref ExpressAppELB
+      Port: 80
+      Protocol: HTTP
+
+  ExpressAppELBHTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ExpressAppELBTargetGroup
+      LoadBalancerArn: !Ref ExpressAppELB
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: 
+            Fn::ImportValue:
+              !Sub ${VPCStack}:HTTPSCertificate
+
+  ExpressAppELBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: ExpressAppELB
+    Properties:
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-elb-tg
+      TargetType: ip
+      HealthCheckEnabled: true
+      HealthCheckPath: "/health"
+      HealthCheckPort: 1337
+      Port: 1337
+      Protocol: HTTP
+      VpcId: 
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ###### Security Groups ######
+  ExpressApplicationELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-application-elb-sg
+      GroupDescription: !Join [ "", [ "Security Group for the ELB of ", !Ref ExpressAppCluster ]]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allows public access to over port 80 to the Apper DevOps Tech Challenge application
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          Description: Allows public access to over port 443 to the Apper DevOps Tech Challenge application
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-application-elb-sg
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  ExpressApplicationECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-application-ecs-sg
+      GroupDescription: !Join [ "", [ "Security Group for the cluster of ", !Ref ExpressAppCluster ]]
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      SecurityGroupIngress:
+        - SourceSecurityGroupId: !GetAtt ExpressApplicationELBSecurityGroup.GroupId
+          Description: Allows public access to over port 80 to the Apper DevOps Tech Challenge application
+          FromPort: 1337
+          ToPort: 1337
+          IpProtocol: tcp
+        - SourceSecurityGroupId:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBSecurityGroup"
+          Description: Allows access to the master DB instance
+          FromPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          ToPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          IpProtocol: tcp
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-ecs-sg
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+  
+  ExpressApplicationDBIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBSecurityGroup"
+      Description: "Allows access to and from the master DB instance"
+      SourceSecurityGroupId: !GetAtt ExpressApplicationECSSecurityGroup.GroupId
+      FromPort:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBPortAddress"
+      ToPort:
+        Fn::ImportValue:
+          !Sub "${RDSStack}:MasterDBPortAddress"
+      IpProtocol: tcp
+
 Outputs:
+  ExpressAppCluster:
+    Description: A reference to the Express Application Cluster
+    Value: !Ref ExpressAppCluster
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppCluster" ] ]
+
+  ExpressAppTaskDefinition:
+    Description: A reference to the Express Application Task Definition
+    Value: !Ref ExpressAppTaskDefinition
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppTaskDefinition" ] ]
+
+  ExpressAppService:
+    Description: A reference to the Express Application Service
+    Value: !Ref ExpressAppService
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppService" ] ]
+
+  ExpressAppDNS:
+    Description: A reference to the Express App DNS
+    Value: !GetAtt ExpressAppELB.DNSName
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppService" ] ]

@@ -153,6 +153,18 @@ Resources:
                   - "s3:*"
                 Resource: !GetAtt S3Bucket.Arn
                 Effect: "Allow"
+              - Action:
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:PutImage"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:BatchGetImage"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:DescribeImages"
+                Resource: "*"
+                Effect: "Allow"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
       Description: The service role used for CodePipeline
@@ -214,6 +226,9 @@ Resources:
                   - "ecr:InitiateLayerUpload"
                   - "ecr:PutImage"
                   - "ecr:UploadLayerPart"
+                  - "ecr:BatchGetImage"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:DescribeImages"
                 Resource: "*"
                 Effect: "Allow"
       Description: The service role used for CodeBuild
@@ -309,10 +324,25 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
                 PrimarySource: express-miniapp
-                # EnvironmentVariables: !Sub '[{"name":"AWS_ACCOUNT_ID","value":"${AWSMainAccountNumber}"},{"name":"IMAGE_TAG","value":"latest"},{"name":"IMAGE_REPO_NAME","value":"${ExpressAppRepository}"}]'
               Name: Build-and-Push
               InputArtifacts:
                 - Name: express-miniapp
+              OutputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
+        - Name: Push-Image-Definition
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: 1
+              Configuration:
+                BucketName: !Ref S3Bucket
+                Extract: true
+              Name: Push-to-S3
+              InputArtifacts:
+                - Name: built-express-miniapp
               RunOrder: 1
       Tags:
         - Key: Name
@@ -323,6 +353,20 @@ Resources:
           Value: !Ref Environment
 
 Outputs:
-  CodePipeline:
-    Description: A reference to the CodePipeline used for building and pushing the Docker Image to ECR
-    Value: !Ref CodePipeline
+  CodePipelineIAMRole:
+    Description: Refers to the IAM Service Role used for CodePipeline
+    Value: !GetAtt CodePipelineIAMRole.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CodePipelineIAMRole" ] ]
+
+  CICDBucket:
+    Description: Refers to the bucket used for CI/CD pipeline
+    Value: !Ref S3Bucket
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CICDBucket" ] ]
+
+  ExpressAppRepository:
+    Description: Refers to the ECR used for the CI/CD pipeline
+    Value: !Ref ExpressAppRepository
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppRepository" ] ]

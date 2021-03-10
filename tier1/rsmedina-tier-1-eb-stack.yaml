@@ -30,6 +30,12 @@ Parameters:
     Description: Please enter the instance type to use for the Elastic Beanstalk application
     Type: String
     Default: "t3.micro"
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+    ConstraintDescription: Please choose a valid instance type.
 
   ###### Stack Parameters #######
   VPCStack:
@@ -123,6 +129,17 @@ Resources:
           OptionName: PathPatterns
           Value: "/**/*"
         - Namespace: "aws:elbv2:listener:default"
+          OptionName: Rules
+          Value: "default"
+        - Namespace: "aws:elbv2:listener:443"
+          OptionName: Protocol
+          Value: "HTTPS"
+        - Namespace: "aws:elbv2:listener:443"
+          OptionName: SSLCertificateArns
+          Value:
+            Fn::ImportValue:
+              !Sub ${VPCStack}:HTTPSCertificate
+        - Namespace: "aws:elbv2:listener:443"
           OptionName: Rules
           Value: "default"
         - Namespace: "aws:elbv2:loadbalancer"
@@ -275,6 +292,11 @@ Resources:
           Description: Allows public access to over port 80 to the Apper DevOps Tech Challenge application
           FromPort: 80
           ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          Description: Allows public access to over port 443 to the Apper DevOps Tech Challenge application
+          FromPort: 443
+          ToPort: 443
           IpProtocol: tcp
       Tags:
         - Key: Name

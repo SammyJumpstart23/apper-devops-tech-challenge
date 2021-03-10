@@ -283,6 +283,18 @@ Resources:
       SubnetId: !Ref Database2Subnet
       RouteTableId: !Ref PrivateRouteTable2
 
+  ###### Amazon Certificate Manager ######
+  HTTPSCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: "*.apperdevops.com" #required
+      ValidationMethod: DNS
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
 Outputs:
   VPC:
     Description: A reference to the created VPC
@@ -316,7 +328,7 @@ Outputs:
 
   Public2Subnet:
     Description: A reference to the public subnet
-    Value: !Ref Public1Subnet
+    Value: !Ref Public2Subnet
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "Public2Subnet" ] ]
 
@@ -343,3 +355,9 @@ Outputs:
     Value: !Ref Database2Subnet
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "Database2Subnet" ] ]
+
+  HTTPSCertificate:
+    Description: A reference to the ACM certificate used for HTTPS connections
+    Value: !Ref HTTPSCertificate
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "HTTPSCertificate" ] ]
