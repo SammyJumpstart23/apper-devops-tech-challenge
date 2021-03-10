@@ -74,26 +74,31 @@ Resources:
   MasterDBInstance:
     Type: AWS::RDS::DBInstance
     Properties:
-      AllocatedStorage: 20
-      AllowMajorVersionUpgrade: False
-      AutoMinorVersionUpgrade: True
-      BackupRetentionPeriod: 30
       DBInstanceClass: !Ref DBInstanceClass
       DBInstanceIdentifier: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-master-db
       DBName: !Sub tier${ChallengeTier}table
-      VPCSecurityGroups:
-        - !GetAtt MasterDBSecurityGroup.GroupId
-      DBSubnetGroupName: !Ref MasterDBSubnetGroup
-      DeleteAutomatedBackups: False
-      DeletionProtection: False
+
       Engine: "mysql"
       EngineVersion: "8.0"
       MasterUserPassword: !Sub "{{resolve:secretsmanager:${MasterDBCredentials}:SecretString:password}}"
       MasterUsername: !Sub "{{resolve:secretsmanager:${MasterDBCredentials}:SecretString:username}}"
-      MaxAllocatedStorage: 100
+
       MultiAZ: true
       PubliclyAccessible: False
       StorageType: gp2
+
+      VPCSecurityGroups:
+        - !GetAtt MasterDBSecurityGroup.GroupId
+      DBSubnetGroupName: !Ref MasterDBSubnetGroup
+
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 100
+      AllowMajorVersionUpgrade: False
+      AutoMinorVersionUpgrade: True
+      BackupRetentionPeriod: 30
+      
+      DeleteAutomatedBackups: False
+      DeletionProtection: False
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
