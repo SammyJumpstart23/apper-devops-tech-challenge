@@ -32,7 +32,8 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        DistributionConfig
+        Enabled: true
+        
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
