@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - VPC
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - VPC
 # Metadata:
 
 Parameters:
@@ -11,7 +11,7 @@ Parameters:
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
-    Default: 1
+    Default: 2
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String

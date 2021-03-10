@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - CI/CD (Deploy)
+# Metadata: 
+
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: "2"
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: CICD
+  AWSMainAccountNumber:
+    Description: Please enter the AWS account number for this stack
+    Type: String
+    Default: 485323199507
+
+  ###### Stack Parameters #######
+  StgECSStack:
+    Description: Please enter the stack name of the staging ECS resources for import
+    Type: String
+    Default: "rsmedina-tier-2-stg-ecs-stack"
+
+  ProdECSStack:
+    Description: Please enter the stack name of the production ECS resources for import
+    Type: String
+    Default: "rsmedina-tier-2-prod-ecs-stack"
+
+  BuildStack:
+    Description: Please enter the stack name of the CI/CD Build pipeline resources for import
+    Type: String
+    Default: "rsmedina-tier-2-cicd-build-stack"
+
+# Mappings: 
+
+# Conditions: 
+
+Resources: 
+  ###### Setup for Push Events ######
+  S3WatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployCodePipeline ] ]
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+  S3WatchEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - CopyObject
+            - PutObject
+            - CompleteMultipartUpload
+          requestParameters:
+            bucketName:
+              - Fn::ImportValue:
+                  !Sub ${BuildStack}:CICDBucket
+            key:
+              - "imageDefinitions.zip"
+      Targets:
+        - Arn: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployCodePipeline ] ]
+          RoleArn: !GetAtt S3WatchEventRole.Arn
+          Id: codepipeline-DeployCodePipeline
+
+  
+
+  ###### CodePipeline ######
+  DeployCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: 
+          Fn::ImportValue:
+            !Sub ${BuildStack}:CICDBucket
+        Type: S3
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-deploy-codepipeline
+      RestartExecutionOnUpdate: true
+      RoleArn:
+        Fn::ImportValue:
+          !Sub ${BuildStack}:CodePipelineIAMRole
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: 1
+              Configuration:
+                S3Bucket:
+                  Fn::ImportValue:
+                    !Sub ${BuildStack}:CICDBucket
+                S3ObjectKey: imageDefinition.zip
+                PollForSourceChanges: false
+              Name: S3-Source-for-Image-Definitions
+              OutputArtifacts:
+                - Name: express-minapp-image
+              RunOrder: 1
+        - Name: Deploy-Staging
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: 1
+              Configuration:
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub ${StgECSStack}:ExpressAppCluster
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub ${StgECSStack}:ExpressAppService
+                FileName: imageDefinitions.json
+              Name: Deploy-Staging
+              InputArtifacts:
+                - Name: express-minapp-image
+              RunOrder: 1
+            - ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                ExternalEntityLink: 
+                  Fn::ImportValue:
+                    !Sub ${StgECSStack}:ExpressAppDNS
+              Name: Approve-Staging
+              RunOrder: 2
+        - Name: Deploy-Production
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: 1
+              Configuration:
+                ClusterName:
+                  Fn::ImportValue:
+                    !Sub ${ProdECSStack}:ExpressAppCluster
+                ServiceName:
+                  Fn::ImportValue:
+                    !Sub ${ProdECSStack}:ExpressAppService
+                FileName: imageDefinitions.json
+              Name: Deploy-Production
+              InputArtifacts:
+                - Name: express-minapp-image
+              RunOrder: 1
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-deploy-codepipeline
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+
+Outputs:
+  DeployCodePipeline:
+    Description: References the codepipeline used for ECS deployment
+    Value: !Ref DeployCodePipeline
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "DeployCodePipeline" ] ]

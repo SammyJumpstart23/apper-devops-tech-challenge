@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - Elastic Beanstalk
-# Metadata: 
-
 Parameters: 
   ###### Shared Parameters ######
   ProjectName:
@@ -30,6 +28,12 @@ Parameters:
     Description: Please enter the instance type to use for the Elastic Beanstalk application
     Type: String
     Default: "t3.micro"
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+    ConstraintDescription: Please choose a valid instance type.
 
   ###### Stack Parameters #######
   VPCStack:
@@ -41,10 +45,6 @@ Parameters:
     Type: String
     Default: "rsmedina-tier-1-stg-rds-stack"
 
-# Mappings: 
-
-# Conditions: 
-
 Resources: 
   ###### Elastic Beanstalk ######
   ExpressApplication:
@@ -52,14 +52,6 @@ Resources:
     Properties:
       ApplicationName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-app
       Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
-
-  # ExpressApplicationVersion:
-  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
-  #   Properties:
-  #     ApplicationName: !Ref ExpressApplication
-  #     SourceBundle:
-  #       S3Bucket: !Ref S3Bucket
-  #       S3Key: express-miniapp.zip
 
   ExpressApplicationConfigurationTemplate:
     Type: AWS::ElasticBeanstalk::ConfigurationTemplate
@@ -190,7 +182,6 @@ Resources:
       Description: AWS Elastic Beanstalk Environment
       EnvironmentName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-app-environment
       TemplateName: !Ref ExpressApplicationConfigurationTemplate
-      # VersionLabel: !Ref ExpressApplicationVersion
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -275,6 +266,11 @@ Resources:
           Description: Allows public access to over port 80 to the Apper DevOps Tech Challenge application
           FromPort: 80
           ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          Description: Allows public access to over port 443 to the Apper DevOps Tech Challenge application
+          FromPort: 443
+          ToPort: 443
           IpProtocol: tcp
       Tags:
         - Key: Name

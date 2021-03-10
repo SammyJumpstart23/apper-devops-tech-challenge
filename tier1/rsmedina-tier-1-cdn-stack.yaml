@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - CDN
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 1
+
+  ###### CDN Parameters ######
+  DomainName:
+    Description: Please enter the domain used for the CloudFront Origin
+    Type: String
+    Default: rsmedina-tier1.apperdevops.com
+
+  HostedZoneId:
+    Description: Please enter the hosted zone ID for creating the record set in
+    Type: String
+    Default: Z08257801AI6TNNWIWVBW
+
+  AcmCertificateArn:
+    Description: Please enter the arn of the ACM certificate used for HTTPS
+    Type: String
+    Default: arn:aws:acm:us-east-1:485323199507:certificate/1c9e9c17-8d54-4b5a-9baf-3ba2e6ddc748
+
+  ###### Stack Parameters #######
+  EBPRODStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-prod-eb-stack"
+
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-1-prod-vpc-stack"
+
+Resources: 
+  ExpressAppCDN:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - DomainName:
+              Fn::ImportValue:
+                !Sub ${EBPRODStack}:ExpressApplicationEndpoint
+            Id: !Ref DomainName
+            CustomOriginConfig:
+              HTTPPort: 80
+              OriginProtocolPolicy: http-only
+        DefaultCacheBehavior:
+          TargetOriginId: !Ref DomainName
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: !Ref ExpressAppCloudfrontCachePolicy
+        PriceClass: PriceClass_All
+        Aliases: 
+          - !Ref DomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: "sni-only"
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+
+  ExpressAppCloudfrontCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub ${ProjectName}-tier-${ChallengeTier}-cdn-cache-policy
+        DefaultTTL: 86400
+        MaxTTL: 31536000
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: "none"
+          EnableAcceptEncodingGzip: True
+          HeadersConfig:
+            HeaderBehavior: "none"
+          QueryStringsConfig:
+            QueryStringBehavior: "all"
+  
+  ExpressAppRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ExpressAppCDN.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+
+Outputs:
+  ExpressAppDomain:
+    Description: Refers to the domain name of the express application
+    Value: !Ref ExpressAppRecordSet
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppDomain" ] ]

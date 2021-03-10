@@ -1,5 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - CI/CD
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - CI/CD
+
 Parameters:
   ###### Shared Parameters ######
   ProjectName:
@@ -9,22 +10,19 @@ Parameters:
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
-    Default: 1
+    Default: "2"
   Environment:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
     Default: CICD
-  
-  ###### Stack Parameters #######
-  EBSTGStack:
-    Description: Please enter the stack name of the VPC resources for import
+  AWSMainAccountNumber:
+    Description: Please enter the AWS account number for this stack
     Type: String
-    Default: "rsmedina-tier-1-stg-eb-stack"
+    Default: 485323199507
 
-  EBPRODStack:
-    Description: Please enter the stack name of the VPC resources for import
-    Type: String
-    Default: "rsmedina-tier-1-prod-eb-stack"
+# Mappings:
+
+# Conditions:
 
 Resources:
   ###### S3 ######
@@ -56,7 +54,34 @@ Resources:
                 "aws:userId":
                   - !Join [ ":", [ !GetAtt CodePipelineIAMRole.RoleId, "*" ] ]
                   - !Join [ ":", [ !GetAtt CodeBuildIAMRole.RoleId, "*" ] ]
-                  - !Ref AWS::AccountId
+                  - !Ref AWSMainAccountNumber
+
+  ###### Elastic Container Repository #######
+  ExpressAppRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub ${ProjectName}-tier-${ChallengeTier}-ecr
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCicdPushPull
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+                - s3.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action:
+              - "ecr:GetDownloadUrlForLayer"
+              - "ecr:BatchGetImage"
+              - "ecr:BatchCheckLayerAvailability"
+              - "ecr:PutImage"
+              - "ecr:InitiateLayerUpload"
+              - "ecr:UploadLayerPart"
+              - "ecr:CompleteLayerUpload"
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
 
   ###### IAM ######
   CodePipelineIAMRole:
@@ -129,23 +154,20 @@ Resources:
                 Resource: !GetAtt S3Bucket.Arn
                 Effect: "Allow"
               - Action:
-                  - "elasticbeanstalk:*"
-                Resource:
-                  - Fn::Join:
-                    - ""
-                    - - !Sub "arn:aws:elasticbeanstalk::${AWS::AccountId}:application/"
-                      - Fn::ImportValue:
-                          !Sub "${EBSTGStack}:ExpressApplication"
-                  - Fn::Join:
-                    - ""
-                    - - !Sub "arn:aws:elasticbeanstalk::${AWS::AccountId}:application/"
-                      - Fn::ImportValue:
-                          !Sub "${EBPRODStack}:ExpressApplication"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:applicationversion/*/*"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:configurationtemplate/*/*"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:environment/*/*"
-                  - "arn:aws:elasticbeanstalk:::platform/*"
-                  - "arn:aws:elasticbeanstalk:::solutionstack/*"
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:PutImage"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:BatchGetImage"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:DescribeImages"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "ecs:*"
+                Resource: "*"
                 Effect: "Allow"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
@@ -201,6 +223,18 @@ Resources:
                   - "codestar-connections:UseConnection"
                 Resource: !Ref CodePipelineGithubConnection
                 Effect: "Allow"
+              - Action:
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:CompleteLayerUpload"
+                  - "ecr:GetAuthorizationToken"
+                  - "ecr:InitiateLayerUpload"
+                  - "ecr:PutImage"
+                  - "ecr:UploadLayerPart"
+                  - "ecr:BatchGetImage"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:DescribeImages"
+                Resource: "*"
+                Effect: "Allow"
       Description: The service role used for CodeBuild
       RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-service-role
       Tags:
@@ -236,11 +270,20 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
         Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWSMainAccountNumber
+          - Name: IMAGE_TAG
+            Value: latest
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref ExpressAppRepository
       Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-build-express-miniapp
       QueuedTimeoutInMinutes: 5
       ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
       Source: 
         Type: CODEPIPELINE
+        BuildSpec: buildspec-2.yml
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -255,7 +298,7 @@ Resources:
       ArtifactStore:
         Location: !Ref S3Bucket
         Type: S3
-      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-pipeline
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-build-pipeline
       RestartExecutionOnUpdate: true
       RoleArn: !GetAtt CodePipelineIAMRole.Arn
       Stages: 
@@ -275,7 +318,7 @@ Resources:
               OutputArtifacts:
                 - Name: express-miniapp
               RunOrder: 1
-        - Name: Build
+        - Name: Build-Docker-Image
           Actions:
             - ActionTypeId:
                 Category: Build
@@ -285,56 +328,24 @@ Resources:
               Configuration:
                 ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
                 PrimarySource: express-miniapp
-              Name: Build-Node
+              Name: Build-and-Push
               InputArtifacts:
                 - Name: express-miniapp
               OutputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
-        - Name: Deploy-Staging
+        - Name: Push-Image-Definition
           Actions:
             - ActionTypeId:
                 Category: Deploy
                 Owner: AWS
-                Provider: ElasticBeanstalk
+                Provider: S3
                 Version: 1
               Configuration:
-                ApplicationName:
-                  Fn::ImportValue:
-                    !Sub ${EBSTGStack}:ExpressApplication
-                EnvironmentName:
-                  Fn::ImportValue:
-                    !Sub ${EBSTGStack}:ExpressApplicationEnvironment
-              Name: Deploy-Node
-              InputArtifacts:
-                - Name: built-express-miniapp
-              RunOrder: 1
-            - ActionTypeId:
-                Category: Approval
-                Owner: AWS
-                Provider: Manual
-                Version: 1
-              Configuration:
-                ExternalEntityLink: 
-                  Fn::ImportValue:
-                    !Sub ${EBSTGStack}:ExpressApplicationEndpoint
-              Name: Test-Approve
-              RunOrder: 2
-        - Name: Deploy-Production
-          Actions:
-            - ActionTypeId:
-                Category: Deploy
-                Owner: AWS
-                Provider: ElasticBeanstalk
-                Version: 1
-              Configuration:
-                ApplicationName:
-                  Fn::ImportValue:
-                    !Sub ${EBPRODStack}:ExpressApplication
-                EnvironmentName:
-                  Fn::ImportValue:
-                    !Sub ${EBPRODStack}:ExpressApplicationEnvironment
-              Name: Deploy-Node
+                BucketName: !Ref S3Bucket
+                Extract: false
+                ObjectKey: imageDefinition.zip
+              Name: Push-to-S3
               InputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
@@ -347,6 +358,20 @@ Resources:
           Value: !Ref Environment
 
 Outputs:
-  CodePipeline:
-    Description: A reference to the CodePipeline used for CI/CD
-    Value: !Ref CodePipeline
+  CodePipelineIAMRole:
+    Description: Refers to the IAM Service Role used for CodePipeline
+    Value: !GetAtt CodePipelineIAMRole.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CodePipelineIAMRole" ] ]
+
+  CICDBucket:
+    Description: Refers to the bucket used for CI/CD pipeline
+    Value: !Ref S3Bucket
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CICDBucket" ] ]
+
+  ExpressAppRepository:
+    Description: Refers to the ECR used for the CI/CD pipeline
+    Value: !Ref ExpressAppRepository
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppRepository" ] ]
