@@ -17,3 +17,9 @@ Tier1:
 - Repo Link: https://github.com/SammyJumpstart23/rsmedina-devops-challenge
 - Commit Hash: e8699d5f1229d246cd32a550b687e60ccda1c0be
 - Working URL: https://rsmedina-tier1.apperdevops.com
+
+Tier2:
+- Repo Name: rsmedina-devops-challenge
+- Repo Link: https://github.com/SammyJumpstart23/rsmedina-devops-challenge
+- Commit Hash: 245967628d2f284ac6234613f165d3c772f8eef5
+- Working URL: https://rsmedina-tier2.apperdevops.com
