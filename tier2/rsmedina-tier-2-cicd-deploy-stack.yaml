@@ -98,7 +98,53 @@ Resources:
           RoleArn: !GetAtt S3WatchEventRole.Arn
           Id: codepipeline-DeployCodePipeline
 
+  ###### CodeDeploy ######
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codedeploy
+      ComputePlatform: ECS
   
+  CodeDeployConfig:
+    Type: AWS::CodeDeploy::DeploymentConfig
+    Properties:
+      DeploymentConfigName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codedeploy-config
+      MinimumHealthyHosts:
+        Type: FLEET_PERCENT
+        Value: 40
+  
+  CodeDeployBlueGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      AutoRollbackConfiguration:
+        AutoRollbackConfiguration
+      AutoScalingGroups:
+        - String
+      Deployment:
+        Revision:
+          RevisionType: AppSpecContent
+      DeploymentConfigName: !Ref CodeDeployConfig
+      DeploymentGroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codedeploy-blue
+      DeploymentStyle:
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+        DeploymentType: BLUE_GREEN
+      LoadBalancerInfo:
+        ElbInfoList:
+          - Name:
+              Fn::ImportValue:
+                !Sub ${ProdECSStack}:ExpressAppELB
+        TargetGroupInfoList:
+          - Name:
+              Fn::ImportValue:
+                !Sub ${ProdECSStack}:ExpressAppELB
+      OnPremisesInstanceTagFilters:
+        - TagFilter
+      OnPremisesTagSet:
+        OnPremisesTagSet
+      ServiceRoleArn: String #required
+      TriggerConfigurations:
+        - TriggerConfig
 
   ###### CodePipeline ######
   DeployCodePipeline:

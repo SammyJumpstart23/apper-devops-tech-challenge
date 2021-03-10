@@ -426,3 +426,9 @@ Outputs:
     Value: !GetAtt ExpressAppELB.DNSName
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppDNS" ] ]
+
+  ExpressAppELB:
+    Description: A reference to the Express App ELB
+    Value: !Ref ExpressAppELB
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppELB" ] ]
