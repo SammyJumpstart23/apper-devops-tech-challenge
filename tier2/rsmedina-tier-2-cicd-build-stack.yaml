@@ -38,6 +38,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   S3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -82,6 +84,8 @@ Resources:
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### IAM ######
   CodePipelineIAMRole:
@@ -178,6 +182,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   CodeBuildIAMRole:
     Type: AWS::IAM::Role
@@ -242,6 +248,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### CodeStar Connection ######
   CodePipelineGithubConnection:
@@ -284,12 +292,14 @@ Resources:
       Source: 
         Type: CODEPIPELINE
         BuildSpec: buildspec-2.yml
+      TimeoutInMinutes: 5
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
-      TimeoutInMinutes: 5
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### Code Pipeline ######
   CodePipeline:
@@ -356,7 +366,9 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
-
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+        
 Outputs:
   CodePipelineIAMRole:
     Description: Refers to the IAM Service Role used for CodePipeline

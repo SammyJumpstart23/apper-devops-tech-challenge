@@ -211,6 +211,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   ExpressApplicationInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -252,6 +254,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ExpressApplicationLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -279,6 +283,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ExpressApplicationDBIngress:
     Type: AWS::EC2::SecurityGroupIngress

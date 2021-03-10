@@ -60,6 +60,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   MasterDBCredentialsTargetAttachment:
     Type: AWS::SecretsManager::SecretTargetAttachment
@@ -97,6 +99,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   ###### Database Network ######
   MasterDBSubnetGroup:
@@ -114,6 +118,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   MasterDBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -130,6 +136,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
 Outputs:
   MasterDBName:

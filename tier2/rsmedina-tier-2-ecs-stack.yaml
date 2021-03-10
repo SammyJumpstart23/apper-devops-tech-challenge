@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - ECS
-# Metadata: 
-
 Parameters: 
   ###### Shared Parameters ######
   ProjectName:
@@ -16,10 +14,6 @@ Parameters:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
     Default: STG
-  AWSMainAccountNumber:
-    Description: Please enter the AWS account number for this stack
-    Type: String
-    Default: 485323199507
 
   ###### ECS Parameters ######
   ECSInstanceType:
@@ -49,13 +43,11 @@ Parameters:
     Type: String
     Default: "rsmedina-tier-2-stg-rds-stack"
 
-# Mappings:
-
-# Conditions:
-#   UseCodeDeploy:
-#     Fn::Equals:
-#       - !Ref Environment
-#       - "PROD"
+Conditions:
+  UseCodeDeploy:
+    Fn::Equals:
+      - !Ref Environment
+      - "PROD"
 
 Resources: 
   ###### Elastic Container Service ######
@@ -73,6 +65,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ExpressAppTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -82,7 +76,7 @@ Resources:
           Image:
             Fn::Join:
               - ""
-              - - !Ref AWSMainAccountNumber
+              - - !Ref AWS::AccountId
                 - ".dkr.ecr.ap-southeast-1.amazonaws.com/"
                 - Fn::ImportValue:
                     !Sub "${BuildStack}:ExpressAppRepository"
@@ -147,6 +141,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
       
   ExpressAppService:
     Type: AWS::ECS::Service
@@ -186,6 +182,31 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ExpressAppAutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 6
+      MinCapacity: 2
+      ResourceId: !Join ['/', [service, !Ref ExpressAppCluster, !GetAtt ExpressAppService.Name]]
+      RoleARN: !GetAtt ExpressAppAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+  
+  ExpressAppAutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-autoscaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ExpressAppAutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        TargetValue: 50
 
   ###### IAM Roles ######
   ExpressAppExecutionRole:
@@ -229,6 +250,22 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ExpressAppAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-autoscaling-role
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
 
   ###### Load Balancer ######
   ExpressAppELB:
@@ -250,36 +287,18 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   ExpressAppELBDefaultListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      DefaultActions:
-        - Type: redirect
-          RedirectConfig:
-            Port: 443
-            Protocol: HTTPS
-            Host: "#{host}"
-            Path: "/#{path}"
-            Query: "#{query}"
-            StatusCode: "HTTP_301"
-      LoadBalancerArn: !Ref ExpressAppELB
-      Port: 80
-      Protocol: HTTP
-
-  ExpressAppELBHTTPSListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
         - Type: forward
           TargetGroupArn: !Ref ExpressAppELBTargetGroup
       LoadBalancerArn: !Ref ExpressAppELB
-      Port: 443
-      Protocol: HTTPS
-      Certificates:
-        - CertificateArn: 
-            Fn::ImportValue:
-              !Sub ${VPCStack}:HTTPSCertificate
+      Port: 80
+      Protocol: HTTP
 
   ExpressAppELBTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -300,6 +319,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### Security Groups ######
   ExpressApplicationELBSecurityGroup:
@@ -316,11 +337,6 @@ Resources:
           FromPort: 80
           ToPort: 80
           IpProtocol: tcp
-        - CidrIp: 0.0.0.0/0
-          Description: Allows public access to over port 443 to the Apper DevOps Tech Challenge application
-          FromPort: 443
-          ToPort: 443
-          IpProtocol: tcp
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-application-elb-sg
@@ -328,6 +344,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ExpressApplicationECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -361,6 +379,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   ExpressApplicationDBIngress:
     Type: AWS::EC2::SecurityGroupIngress
@@ -401,4 +421,4 @@ Outputs:
     Description: A reference to the Express App DNS
     Value: !GetAtt ExpressAppELB.DNSName
     Export:
-      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppService" ] ]
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppDNS" ] ]

@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - VPC
-# Metadata:
-
 Parameters:
   ###### Shared Parameters ######
   ProjectName:
@@ -47,12 +45,8 @@ Parameters:
     Type: String
     Default: 192.168.224.0/19
 
-# Mappings:
-
-# Conditions:
-
 Resources:
-  # VPC resources
+  ###### VPC resources ######
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -66,6 +60,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -77,6 +73,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
@@ -96,6 +94,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   Public2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -109,6 +109,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   Private1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -122,6 +124,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   Private2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -135,6 +139,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   Database1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -148,6 +154,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   Database2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -161,6 +169,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   NatGateway1EIP:
     Type: AWS::EC2::EIP
@@ -179,6 +189,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   NatGateway2EIP:
     Type: AWS::EC2::EIP
@@ -197,6 +209,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
@@ -209,6 +223,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   DefaultPublicRoute:
     Type: AWS::EC2::Route
     Properties:
@@ -238,6 +254,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   PrivateRouteTable2:
     Type: AWS::EC2::RouteTable
     Properties:
@@ -249,6 +267,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   DefaultPrivateRoute1:
     Type: AWS::EC2::Route
     Properties:
@@ -282,18 +302,6 @@ Resources:
     Properties:
       SubnetId: !Ref Database2Subnet
       RouteTableId: !Ref PrivateRouteTable2
-
-  ###### Amazon Certificate Manager ######
-  HTTPSCertificate:
-    Type: AWS::CertificateManager::Certificate
-    Properties:
-      DomainName: "*.apperdevops.com" #required
-      ValidationMethod: DNS
-      Tags:
-        - Key: TIER
-          Value: !Ref ChallengeTier
-        - Key: ENV
-          Value: !Ref Environment
 
 Outputs:
   VPC:
@@ -355,9 +363,3 @@ Outputs:
     Value: !Ref Database2Subnet
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "Database2Subnet" ] ]
-
-  HTTPSCertificate:
-    Description: A reference to the ACM certificate used for HTTPS connections
-    Value: !Ref HTTPSCertificate
-    Export:
-      Name: !Join [ ":", [ !Ref "AWS::StackName", "HTTPSCertificate" ] ]
