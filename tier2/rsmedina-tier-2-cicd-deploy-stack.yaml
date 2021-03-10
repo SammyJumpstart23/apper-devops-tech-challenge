@@ -120,7 +120,7 @@ Resources:
                 S3Bucket:
                   Fn::ImportValue:
                     !Sub ${BuildStack}:CICDBucket
-                S3ObjectKey: image.zip
+                S3ObjectKey: imageDefinition.zip
                 PollForSourceChanges: false
               Name: S3-Source-for-Image-Definitions
               OutputArtifacts:
