@@ -339,7 +339,8 @@ Resources:
                 Version: 1
               Configuration:
                 BucketName: !Ref S3Bucket
-                Extract: true
+                Extract: false
+                ObjectKey: image.zip
               Name: Push-to-S3
               InputArtifacts:
                 - Name: built-express-miniapp
