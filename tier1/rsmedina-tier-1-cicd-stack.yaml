@@ -1,6 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - CI/CD
-
 Parameters:
   ###### Shared Parameters ######
   ProjectName:
@@ -15,10 +14,6 @@ Parameters:
     Description: Please enter the environment for this stack (e.g. STG, PROD)
     Type: String
     Default: CICD
-  AWSMainAccountNumber:
-    Description: Please enter the AWS account number for this stack
-    Type: String
-    Default: 485323199507
   
   ###### Stack Parameters #######
   EBSTGStack:
@@ -30,10 +25,6 @@ Parameters:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
     Default: "rsmedina-tier-1-prod-eb-stack"
-
-# Mappings:
-
-# Conditions:
 
 Resources:
   ###### S3 ######
@@ -65,7 +56,7 @@ Resources:
                 "aws:userId":
                   - !Join [ ":", [ !GetAtt CodePipelineIAMRole.RoleId, "*" ] ]
                   - !Join [ ":", [ !GetAtt CodeBuildIAMRole.RoleId, "*" ] ]
-                  - !Ref AWSMainAccountNumber
+                  - !Ref AWS::AccountId
 
   ###### IAM ######
   CodePipelineIAMRole:
@@ -142,17 +133,17 @@ Resources:
                 Resource:
                   - Fn::Join:
                     - ""
-                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWS::AccountId}:application/"
                       - Fn::ImportValue:
                           !Sub "${EBSTGStack}:ExpressApplication"
                   - Fn::Join:
                     - ""
-                    - - !Sub "arn:aws:elasticbeanstalk::${AWSMainAccountNumber}:application/"
+                    - - !Sub "arn:aws:elasticbeanstalk::${AWS::AccountId}:application/"
                       - Fn::ImportValue:
                           !Sub "${EBPRODStack}:ExpressApplication"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:applicationversion/*/*"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:configurationtemplate/*/*"
-                  - !Sub "arn:aws:elasticbeanstalk:*:${AWSMainAccountNumber}:environment/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:applicationversion/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:configurationtemplate/*/*"
+                  - !Sub "arn:aws:elasticbeanstalk:*:${AWS::AccountId}:environment/*/*"
                   - "arn:aws:elasticbeanstalk:::platform/*"
                   - "arn:aws:elasticbeanstalk:::solutionstack/*"
                 Effect: "Allow"

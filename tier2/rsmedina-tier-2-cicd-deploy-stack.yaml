@@ -42,6 +42,7 @@ Parameters:
 # Conditions: 
 
 Resources: 
+  ###### Setup for Push Events ######
   S3WatchEventRole:
     Type: AWS::IAM::Role
     Properties:
@@ -95,6 +96,9 @@ Resources:
           RoleArn: !GetAtt S3WatchEventRole.Arn
           Id: codepipeline-DeployCodePipeline
 
+  
+
+  ###### CodePipeline ######
   DeployCodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:

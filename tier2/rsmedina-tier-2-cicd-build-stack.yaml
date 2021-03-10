@@ -165,6 +165,10 @@ Resources:
                   - "ecr:DescribeImages"
                 Resource: "*"
                 Effect: "Allow"
+              - Action:
+                  - "ecs:*"
+                Resource: "*"
+                Effect: "Allow"
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSElasticBeanstalkRoleCore
       Description: The service role used for CodePipeline

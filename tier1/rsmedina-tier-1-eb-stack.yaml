@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - Elastic Beanstalk
-# Metadata: 
-
 Parameters: 
   ###### Shared Parameters ######
   ProjectName:
@@ -47,10 +45,6 @@ Parameters:
     Type: String
     Default: "rsmedina-tier-1-stg-rds-stack"
 
-# Mappings: 
-
-# Conditions: 
-
 Resources: 
   ###### Elastic Beanstalk ######
   ExpressApplication:
@@ -58,14 +52,6 @@ Resources:
     Properties:
       ApplicationName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-app
       Description: AWS Elastic Beanstalk Application for Apper DevOps Engineer Technical Challenge - Tier 1
-
-  # ExpressApplicationVersion:
-  #   Type: AWS::ElasticBeanstalk::ApplicationVersion
-  #   Properties:
-  #     ApplicationName: !Ref ExpressApplication
-  #     SourceBundle:
-  #       S3Bucket: !Ref S3Bucket
-  #       S3Key: express-miniapp.zip
 
   ExpressApplicationConfigurationTemplate:
     Type: AWS::ElasticBeanstalk::ConfigurationTemplate
@@ -129,17 +115,6 @@ Resources:
           OptionName: PathPatterns
           Value: "/**/*"
         - Namespace: "aws:elbv2:listener:default"
-          OptionName: Rules
-          Value: "default"
-        - Namespace: "aws:elbv2:listener:443"
-          OptionName: Protocol
-          Value: "HTTPS"
-        - Namespace: "aws:elbv2:listener:443"
-          OptionName: SSLCertificateArns
-          Value:
-            Fn::ImportValue:
-              !Sub ${VPCStack}:HTTPSCertificate
-        - Namespace: "aws:elbv2:listener:443"
           OptionName: Rules
           Value: "default"
         - Namespace: "aws:elbv2:loadbalancer"
@@ -207,7 +182,6 @@ Resources:
       Description: AWS Elastic Beanstalk Environment
       EnvironmentName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-app-environment
       TemplateName: !Ref ExpressApplicationConfigurationTemplate
-      # VersionLabel: !Ref ExpressApplicationVersion
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
