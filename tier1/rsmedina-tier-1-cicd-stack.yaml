@@ -40,6 +40,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   S3BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -156,6 +158,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
   
   CodeBuildIAMRole:
     Type: AWS::IAM::Role
@@ -208,6 +212,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### CodeStar Connection ######
   CodePipelineGithubConnection:
@@ -220,6 +226,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### Code Build ######
   CodeBuildProjectBuildExpressMiniapp:
@@ -241,12 +249,14 @@ Resources:
       ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
       Source: 
         Type: CODEPIPELINE
+      TimeoutInMinutes: 5
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
-      TimeoutInMinutes: 5
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
   ###### Code Pipeline ######
   CodePipeline:
@@ -345,6 +355,8 @@ Resources:
           Value: !Ref ChallengeTier
         - Key: ENV
           Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
 
 Outputs:
   CodePipeline:

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 1 - CDN
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - CDN
 Parameters: 
   ###### Shared Parameters ######
   ProjectName:
@@ -9,13 +9,13 @@ Parameters:
   ChallengeTier:
     Description: Please enter the challenge tier for this stack (e.g. 1)
     Type: String
-    Default: 1
+    Default: 2
 
   ###### CDN Parameters ######
   DomainName:
     Description: Please enter the domain used for the CloudFront Origin
     Type: String
-    Default: rsmedina-tier1.apperdevops.com
+    Default: rsmedina-tier2.apperdevops.com
 
   HostedZoneId:
     Description: Please enter the hosted zone ID for creating the record set in
@@ -28,15 +28,15 @@ Parameters:
     Default: arn:aws:acm:us-east-1:485323199507:certificate/1c9e9c17-8d54-4b5a-9baf-3ba2e6ddc748
 
   ###### Stack Parameters #######
-  EBPRODStack:
-    Description: Please enter the stack name of the VPC resources for import
+  EcsPRODStack:
+    Description: Please enter the stack name of the ECS resources for import
     Type: String
-    Default: "rsmedina-tier-1-prod-eb-stack"
+    Default: "rsmedina-tier-2-prod-ecs-stack"
 
   VPCStack:
     Description: Please enter the stack name of the VPC resources for import
     Type: String
-    Default: "rsmedina-tier-1-prod-vpc-stack"
+    Default: "rsmedina-tier-2-prod-vpc-stack"
 
 Resources: 
   ExpressAppCDN:
@@ -47,7 +47,7 @@ Resources:
         Origins:
           - DomainName:
               Fn::ImportValue:
-                !Sub ${EBPRODStack}:ExpressApplicationEndpoint
+                !Sub ${EcsPRODStack}:ExpressAppDNS
             Id: !Ref DomainName
             CustomOriginConfig:
               HTTPPort: 80
