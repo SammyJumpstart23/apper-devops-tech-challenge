@@ -154,7 +154,11 @@ Resources:
           Enable: true
           Rollback: true
       DeploymentController:
-        Type: "ECS"
+        Type:
+          Fn::If:
+            - UseCodeDeploy
+            - CODE_DEPLOY
+            - ECS
       DesiredCount: 2
       EnableECSManagedTags: true
       HealthCheckGracePeriodSeconds: 15
