@@ -1,0 +1,326 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 3 - EKS
+Parameters: 
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: 3
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: STG
+
+  ###### EKS Parameters ######
+  EKSInstanceType:
+    Description: Please input the instance type to use for the ECS cluster
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+
+  ###### Stack Parameters #######
+  VPCStack:
+    Description: Please enter the stack name of the VPC resources for import
+    Type: String
+    Default: "rsmedina-tier-3-stg-vpc-stack"
+
+  RDSStack:
+    Description: Please enter the stack name of the RDS resources for import
+    Type: String
+    Default: "rsmedina-tier-3-stg-rds-stack"
+
+Resources: 
+  ###### VPC additions ######
+  ExpressAppEc2VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2
+      SubnetIds:
+        - Fn::ImportValue:
+              !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppEcrApiVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppEcrDkrVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppS3VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+      RouteTableIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:PrivateRouteTable1
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:PrivateRouteTable2
+      VpcEndpointType: Gateway
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppLogsVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppStsVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.sts
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppElbVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.elasticloadbalancing
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ExpressAppAsgVPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.autoscaling
+      SubnetIds:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      VpcEndpointType: Interface
+      VpcId:
+        Fn::ImportValue:
+          !Sub ${VPCStack}:VPC
+
+  ###### EKS ######
+  ExpressAppEKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-cluster
+      ResourcesVpcConfig:
+        SecurityGroupIds:
+          - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        SubnetIds:
+          - Fn::ImportValue:
+              !Sub ${VPCStack}:Public1Subnet
+          - Fn::ImportValue:
+              !Sub ${VPCStack}:Public2Subnet
+          - Fn::ImportValue:
+              !Sub ${VPCStack}:Private1Subnet
+          - Fn::ImportValue:
+              !Sub ${VPCStack}:Private2Subnet
+      RoleArn: !GetAtt ExpressAppEKSRole.Arn
+
+  ExpressAppEKSNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      NodegroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-nodegroup
+      NodeRole: !GetAtt ExpressAppEKSNodeGroupRole.Arn
+      ClusterName: !Ref ExpressAppEKSCluster
+      AmiType: AL2_x86_64
+      CapacityType: ON_DEMAND
+      InstanceTypes:
+        - !Ref EKSInstanceType
+      Labels: !Sub '{"app":"express-minapp","env":"${Environment}"}'
+      ScalingConfig:
+        DesiredSize: 3
+        MaxSize: 6
+        MinSize: 2
+      Subnets:
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private1Subnet
+        - Fn::ImportValue:
+            !Sub ${VPCStack}:Private2Subnet
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ###### EKS Add-ons ######
+  ExpressAppEKSVpcCniAddOn:
+    Type: AWS::EKS::Addon
+    DependsOn: ExpressAppEKSCluster
+    Properties:
+      AddonName: vpc-cni
+      ClusterName: !Ref ExpressAppEKSCluster
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ###### IAM ######
+  ExpressAppEKSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-service-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ExpressAppEKSNodeGroupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-nodegroup-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+
+  ###### Security Groups ######
+  ExpressAppEKSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-application-eks-sg
+      GroupDescription: "Security Group for the EKS cluster"
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${VPCStack}:VPC"
+      SecurityGroupIngress:
+        # - SourceSecurityGroupId: !GetAtt ExpressApplicationELBSecurityGroup.GroupId
+        #   Description: Allows public access to over port 1337 to the Apper DevOps Tech Challenge application
+        #   FromPort: 1337
+        #   ToPort: 1337
+        #   IpProtocol: tcp
+        - SourceSecurityGroupId:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBSecurityGroup"
+          Description: Allows access to the master DB instance
+          FromPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          ToPort:
+            Fn::ImportValue:
+              !Sub "${RDSStack}:MasterDBPortAddress"
+          IpProtocol: tcp
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-ecs-sg
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+Outputs:
+  ExpressAppEKSCluster:
+    Description: The arn of the EKS cluster created
+    Value: !GetAtt ExpressAppEKSCluster.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppEKSCluster" ] ]
+      
