@@ -45,6 +45,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -59,6 +60,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.api
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -73,6 +75,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.ecr.dkr
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -98,6 +101,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.logs
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -112,6 +116,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.sts
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -126,6 +131,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.elasticloadbalancing
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -140,6 +146,7 @@ Resources:
       PrivateDnsEnabled: true
       SecurityGroupIds:
         - !GetAtt ExpressAppEKSSecurityGroup.GroupId
+        - !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
       ServiceName: !Sub com.amazonaws.${AWS::Region}.autoscaling
       SubnetIds:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
@@ -165,7 +172,6 @@ Resources:
 
   ExpressAppEKSNodeGroup:
     Type: AWS::EKS::Nodegroup
-    DependsOn: ExpressAppEKSCluster
     Properties:
       # NodegroupName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-nodegroup
       NodeRole: !GetAtt ExpressAppEKSNodeGroupRole.Arn
@@ -185,17 +191,12 @@ Resources:
         - Fn::ImportValue: !Sub ${VPCStack}:Private1Subnet
         - Fn::ImportValue: !Sub ${VPCStack}:Private2Subnet
       # Tags:
-      #   - Key: TIER
-      #     Value: !Ref ChallengeTier
-      #   - Key: ENV
-      #     Value: !Ref Environment
-      #   - Key: PROJECT_NAME
-      #     Value: !Ref ProjectName
+      #   - Key: !Sub kubernetes.io/cluster/${ExpressAppEKSCluster}
+      #     Value: owned
 
   ###### EKS Add-ons ######
   ExpressAppEKSVpcCniAddOn:
     Type: AWS::EKS::Addon
-    DependsOn: ExpressAppEKSNodeGroup
     Properties:
       AddonName: vpc-cni
       ClusterName: !Ref ExpressAppEKSCluster
@@ -245,6 +246,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
         - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -285,6 +287,28 @@ Resources:
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
 
+  ExpressAppDBIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allows access to the master DB instance from EKS SG
+      SourceSecurityGroupId: !GetAtt ExpressAppEKSSecurityGroup.GroupId
+      FromPort: 3306
+      ToPort: 3306
+      GroupId: 
+        Fn::ImportValue: !Sub "${RDSStack}:MasterDBSecurityGroup"
+      IpProtocol: tcp
+
+  ExpressAppDBIngressFromEKS:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allows access to the master DB instance from EKS managed node SG
+      SourceSecurityGroupId: !GetAtt ExpressAppEKSCluster.ClusterSecurityGroupId
+      FromPort: 3306
+      ToPort: 3306
+      GroupId: 
+        Fn::ImportValue: !Sub "${RDSStack}:MasterDBSecurityGroup"
+      IpProtocol: tcp
+      
 Outputs:
   ExpressAppEKSCluster:
     Description: The arn of the EKS cluster created
