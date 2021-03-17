@@ -341,6 +341,21 @@ Resources:
               OutputArtifacts:
                 - Name: built-express-miniapp
               RunOrder: 1
+        - Name: Push-K8s-Manifest
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: 1
+              Configuration:
+                BucketName: !Ref S3Bucket
+                Extract: false
+                ObjectKey: eks/manifest.zip
+              Name: Push-to-S3
+              InputArtifacts:
+                - Name: built-express-miniapp
+              RunOrder: 1
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codepipeline

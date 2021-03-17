@@ -23,3 +23,9 @@ phases:
   post_build:
     commands:
       - echo Build completed on `date`
+
+artifacts:
+  files:
+    - manifest.yaml
+  name: express-minapp
+  base-directory: express-minapp
