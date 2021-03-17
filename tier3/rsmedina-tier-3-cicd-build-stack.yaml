@@ -284,7 +284,7 @@ Resources:
       ServiceRole: !GetAtt CodeBuildIAMRole.Arn 
       Source: 
         Type: CODEPIPELINE
-        BuildSpec: buildspec-3.yml
+        BuildSpec: buildspec-3-build.yml
       TimeoutInMinutes: 5
       Tags:
         - Key: TIER
@@ -348,6 +348,11 @@ Resources:
           Value: !Ref ProjectName
         
 Outputs:
+  CodeBuildIAMRole:
+    Value: !GetAtt CodeBuildIAMRole.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CodeBuildIAMRole" ] ]
+
   CodePipelineIAMRole:
     Description: Refers to the IAM Service Role used for CodePipeline
     Value: !GetAtt CodePipelineIAMRole.Arn

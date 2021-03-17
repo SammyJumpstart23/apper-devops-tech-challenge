@@ -317,8 +317,14 @@ Resources:
       IpProtocol: tcp
       
 Outputs:
-  ExpressAppEKSCluster:
+  ExpressAppEKSClusterName:
+    Description: The name of the EKS cluster created
+    Value: !Ref ExpressAppEKSCluster
+    Export:
+      Name: !Join [":", [!Ref "AWS::StackName", "ExpressAppEKSClusterName"]]
+
+  ExpressAppEKSClusterArn:
     Description: The arn of the EKS cluster created
     Value: !GetAtt ExpressAppEKSCluster.Arn
     Export:
-      Name: !Join [":", [!Ref "AWS::StackName", "ExpressAppEKSCluster"]]
+      Name: !Join [":", [!Ref "AWS::StackName", "ExpressAppEKSClusterArn"]]
