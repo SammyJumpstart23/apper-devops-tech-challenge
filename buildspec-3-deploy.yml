@@ -16,6 +16,7 @@ phases:
       # - unzip awscliv2.zip
       # - sudo ./aws/install
       # - aws --version
+      - yum install -y awscli
   pre_build:
     commands:
       - echo Entered the pre_build phase...
