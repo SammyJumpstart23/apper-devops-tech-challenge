@@ -195,7 +195,7 @@ Resources:
                 S3Bucket:
                   Fn::ImportValue:
                     !Sub ${BuildStack}:CICDBucket
-                S3ObjectKey: /eks/manifest.zip
+                S3ObjectKey: eks/manifest.zip
                 PollForSourceChanges: false
               Name: S3-Source-for-Image-Definitions
               OutputArtifacts:
