@@ -1,0 +1,282 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Apper DevOps Engineer Technical Challenge - Sammy Medina - Tier 2 - CI/CD (Deploy)
+# Metadata:
+
+Parameters:
+  ###### Shared Parameters ######
+  ProjectName:
+    Description: Please enter the name of the project
+    Type: String
+    Default: rsmedina
+  ChallengeTier:
+    Description: Please enter the challenge tier for this stack (e.g. 1)
+    Type: String
+    Default: "3"
+  Environment:
+    Description: Please enter the environment for this stack (e.g. STG, PROD)
+    Type: String
+    Default: CICD
+
+  ###### Stack Parameters #######
+  StgEKSStack:
+    Description: Please enter the stack name of the staging EKS resources for import
+    Type: String
+    Default: "rsmedina-tier-3-stg-eks-stack"
+
+  ProdEKSStack:
+    Description: Please enter the stack name of the production EKS resources for import
+    Type: String
+    Default: "rsmedina-tier-3-prod-eks-stack"
+
+  StgRDSStack:
+    Description: Please enter the stack name of the staging RDS resources for import
+    Type: String
+    Default: "rsmedina-tier-3-stg-rds-stack"
+
+  BuildStack:
+    Description: Please enter the stack name of the CI/CD Build pipeline resources for import
+    Type: String
+    Default: "rsmedina-tier-3-cicd-build-stack"
+
+Resources:
+  ###### Setup for Push Events ######
+  S3WatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployCodePipeline ] ]
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  S3WatchEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - CopyObject
+            - PutObject
+            - CompleteMultipartUpload
+          requestParameters:
+            bucketName:
+              - Fn::ImportValue:
+                  !Sub ${BuildStack}:CICDBucket
+            key:
+              - "eks/express-minapp-deploy.zip"
+      Targets:
+        - Arn: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployCodePipeline ] ]
+          RoleArn: !GetAtt S3WatchEventRole.Arn
+          Id: codepipeline-DeployCodePipeline
+
+  AWSCloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AWSCloudTrailBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt AWSCloudTrailBucket.Arn
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Join [ '', [ !GetAtt AWSCloudTrailBucket.Arn, '/AWSLogs/', !Ref 'AWS::AccountId', '/*' ] ]
+            Condition: 
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+  AWSCloudTrailBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  AwsCloudTrail:
+    DependsOn:
+      - AWSCloudTrailBucketPolicy
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      S3BucketName: !Ref AWSCloudTrailBucket
+      EventSelectors:
+        - DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - Fn::Join:
+                    - ""
+                    - - Fn::ImportValue: !Sub ${BuildStack}:CICDBucketArn
+                      - "/"
+                      - "eks/express-minapp-deploy.zip"
+          ReadWriteType: WriteOnly
+      IncludeGlobalServiceEvents: true
+      IsLogging: true
+      IsMultiRegionTrail: true
+
+  ###### CodeBuild ######
+  CodeBuildProjectDeployExpressMiniapp:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location:
+          Fn::Join:
+            - "/"
+            - - Fn::ImportValue: !Sub ${BuildStack}:CICDBucket
+              - "cache"
+      ConcurrentBuildLimit: 3
+      Description: The CodeBuild project for deploying the express-miniapp project
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: amazonlinux:latest
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: HOST
+            Value:
+              Fn::Join:
+                - ":"
+                - - "{{resolve"
+                  - "secretsmanager"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
+                  - "SecretString"
+                  - "host}}"
+          - Name: USERNAME
+            Value:
+              Fn::Join:
+                - ":"
+                - - "{{resolve"
+                  - "secretsmanager"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
+                  - "SecretString"
+                  - "username}}"
+          - Name: PASSWORD
+            Value:
+              Fn::Join:
+                - ":"
+                - - "{{resolve"
+                  - "secretsmanager"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
+                  - "SecretString"
+                  - "password}}"
+          - Name: DATABASE
+            Value:
+              Fn::Join:
+                - ":"
+                - - "{{resolve"
+                  - "secretsmanager"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
+                  - "SecretString"
+                  - "dbname}}"
+          - Name: AWS_CLUSTER_NAME
+            Value:
+              Fn::ImportValue: !Sub ${StgEKSStack}:ExpressAppEKSClusterName
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-codebuild-deploy-express-miniapp
+      QueuedTimeoutInMinutes: 5
+      ServiceRole:
+        Fn::ImportValue: !Sub ${BuildStack}:CodeBuildIAMRole
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec-3-deploy.yml
+      TimeoutInMinutes: 5
+      Tags:
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  ###### CodePipeline ######
+  DeployCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location:
+          Fn::ImportValue: !Sub ${BuildStack}:CICDBucket
+        Type: S3
+      Name: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-deploy-codepipeline
+      RestartExecutionOnUpdate: true
+      RoleArn:
+        Fn::ImportValue: !Sub ${BuildStack}:CodePipelineIAMRole
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: S3
+                Version: 1
+              Configuration:
+                S3Bucket:
+                  Fn::ImportValue:
+                    !Sub ${BuildStack}:CICDBucket
+                S3ObjectKey: eks/express-minapp-deploy.zip
+                PollForSourceChanges: false
+              Name: S3-Source-for-Image-Definitions
+              OutputArtifacts:
+                - Name: express-minapp-manifest
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectDeployExpressMiniapp
+                PrimarySource: express-miniapp-manifest
+              Name: Deploy-to-EKS
+              InputArtifacts:
+                - Name: express-minapp-manifest
+              RunOrder: 2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-deploy-codepipeline
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+Outputs:
+  DeployCodePipeline:
+    Description: References the codepipeline used for ECS deployment
+    Value: !Ref DeployCodePipeline
+    Export:
+      Name: !Join [":", [!Ref "AWS::StackName", "DeployCodePipeline"]]
