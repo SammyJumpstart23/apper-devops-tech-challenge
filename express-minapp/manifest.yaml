@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: express-minapp-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    ingress.kubernetes.io/rewrite-target: /
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
@@ -12,6 +12,11 @@ spec:
     - http:
         paths:
           - path: /
+            pathType: Prefix
+            backend:
+              serviceName: express-minapp-service
+              servicePort: 80
+          - path: /health
             pathType: Prefix
             backend:
               serviceName: express-minapp-service
