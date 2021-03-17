@@ -140,7 +140,7 @@ Resources:
                   - "codebuild:StartBuild"
                   - "codebuild:BatchGetBuildBatches"
                   - "codebuild:StartBuildBatch"
-                Resource: !GetAtt CodeBuildProjectBuildExpressMiniapp.Arn
+                Resource: "*"
                 Effect: "Allow"
               - Action:
                   - "codestar-connections:UseConnection"
@@ -232,6 +232,10 @@ Resources:
                   - "ecr:BatchGetImage"
                   - "ecr:GetDownloadUrlForLayer"
                   - "ecr:DescribeImages"
+                Resource: "*"
+                Effect: "Allow"
+              - Action:
+                  - "eks:*"
                 Resource: "*"
                 Effect: "Allow"
       Description: The service role used for CodeBuild
@@ -370,3 +374,8 @@ Outputs:
     Value: !Ref ExpressAppRepository
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "ExpressAppRepository" ] ]
+  
+  CodePipelineGithubConnection:
+    Value: !GetAtt CodePipelineGithubConnection.ConnectionArn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CodePipelineGithubConnection" ] ]

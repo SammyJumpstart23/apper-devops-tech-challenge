@@ -66,7 +66,7 @@ Resources:
                 - ":"
                 - - "{{resolve"
                   - "secretsmanager"
-                  - Fn::ImportValue: !Sub "${RDSStack}:MasterDBInfo"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
                   - "SecretString"
                   - "host}}"
           - Name: USERNAME
@@ -75,7 +75,7 @@ Resources:
                 - ":"
                 - - "{{resolve"
                   - "secretsmanager"
-                  - Fn::ImportValue: !Sub "${RDSStack}:MasterDBInfo"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
                   - "SecretString"
                   - "username}}"
           - Name: PASSWORD
@@ -84,7 +84,7 @@ Resources:
                 - ":"
                 - - "{{resolve"
                   - "secretsmanager"
-                  - Fn::ImportValue: !Sub "${RDSStack}:MasterDBInfo"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
                   - "SecretString"
                   - "password}}"
           - Name: DATABASE
@@ -93,7 +93,7 @@ Resources:
                 - ":"
                 - - "{{resolve"
                   - "secretsmanager"
-                  - Fn::ImportValue: !Sub "${RDSStack}:MasterDBInfo"
+                  - Fn::ImportValue: !Sub ${StgRDSStack}:MasterDBInfo
                   - "SecretString"
                   - "dbname}}"
           - Name: AWS_CLUSTER_NAME
@@ -140,6 +140,8 @@ Resources:
                   Fn::ImportValue: !Sub ${BuildStack}:ExpressAppRepository
                 ImageTag: latest
               Name: Source
+              OutputArtifacts:
+                - Name: express-miniapp-ecr
               RunOrder: 1
             - ActionTypeId:
                 Category: Source
@@ -147,7 +149,8 @@ Resources:
                 Provider: CodeStarSourceConnection
                 Version: 1
               Configuration:
-                ConnectionArn: !GetAtt CodePipelineGithubConnection.ConnectionArn
+                ConnectionArn:
+                  Fn::ImportValue: !Sub ${BuildStack}:CodePipelineGithubConnection
                 FullRepositoryId: SammyJumpstart23/rsmedina-devops-challenge
                 BranchName: !Sub tier-${ChallengeTier}
                 OutputArtifactFormat: CODEBUILD_CLONE_REF
@@ -163,7 +166,7 @@ Resources:
                 Provider: CodeBuild
                 Version: 1
               Configuration:
-                ProjectName: !Ref CodeBuildProjectBuildExpressMiniapp
+                ProjectName: !Ref CodeBuildProjectDeployExpressMiniapp
                 PrimarySource: express-miniapp
               Name: Deploy-to-EKS
               InputArtifacts:
