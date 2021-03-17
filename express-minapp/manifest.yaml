@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: express-minapp-ingress
@@ -6,13 +6,15 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          serviceName: express-minapp-service
-          servicePort: 80
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: express-minapp-service
+                port:
+                  number: 80
 ---
 apiVersion: v1
 kind: Service
@@ -28,7 +30,7 @@ spec:
 ---
 apiVersion: apps/v1
 kind: Deployment
-metadata: 
+metadata:
   name: express-minapp-deployment
 spec:
   replicas: 3

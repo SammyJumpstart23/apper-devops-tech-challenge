@@ -161,7 +161,7 @@ Resources:
       Description: The CodeBuild project for deploying the express-miniapp project
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/standard:5.0
+        Image: ubuntu:latest
         Type: LINUX_CONTAINER
         PrivilegedMode: true
         EnvironmentVariables:
