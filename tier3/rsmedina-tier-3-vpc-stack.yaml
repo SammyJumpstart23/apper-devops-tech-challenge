@@ -19,31 +19,31 @@ Parameters:
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
-    Default: 192.82.0.0/16
+    Default: 172.20.0.0/16
   PublicSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the first Public Subnet
     Type: String
-    Default: 192.82.0.0/18
+    Default: 172.20.0.0/18
   PublicSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the second Public Subnet
     Type: String
-    Default: 192.82.64.0/18
+    Default: 172.20.64.0/18
   PrivateSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the first Private Subnet
     Type: String
-    Default: 192.82.128.0/19
+    Default: 172.20.128.0/19
   PrivateSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the second Private Subnet
     Type: String
-    Default: 192.82.160.0/19
+    Default: 172.20.160.0/19
   DatabaseSubnet1CIDR:
     Description: Please enter the IP range (CIDR notation) for the first Database Subnet
     Type: String
-    Default: 192.82.192.0/19
+    Default: 172.20.192.0/19
   DatabaseSubnet2CIDR:
     Description: Please enter the IP range (CIDR notation) for the second Database Subnet
     Type: String
-    Default: 192.82.224.0/19
+    Default: 172.20.224.0/19
 
 Resources:
   ###### VPC resources ######
@@ -96,6 +96,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/elb
+          Value: 1
   Public2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -111,6 +113,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/elb
+          Value: 1
   Private1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -126,6 +130,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
   Private2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -141,6 +147,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
   Database1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -165,6 +173,46 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-database-subnet-2
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref Public1Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-nat-gateway-1
+        - Key: TIER
+          Value: !Ref ChallengeTier
+        - Key: ENV
+          Value: !Ref Environment
+        - Key: PROJECT_NAME
+          Value: !Ref ProjectName
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref Public2Subnet
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-nat-gateway-2
         - Key: TIER
           Value: !Ref ChallengeTier
         - Key: ENV
@@ -229,6 +277,18 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
 
   PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
