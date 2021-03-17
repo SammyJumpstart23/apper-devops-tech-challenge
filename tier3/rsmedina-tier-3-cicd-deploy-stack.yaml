@@ -95,6 +95,55 @@ Resources:
           RoleArn: !GetAtt S3WatchEventRole.Arn
           Id: codepipeline-DeployCodePipeline
 
+  AWSCloudTrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AWSCloudTrailBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt AWSCloudTrailBucket.Arn
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Join [ '', [ !GetAtt AWSCloudTrailBucket.Arn, '/AWSLogs/', !Ref 'AWS::AccountId', '/*' ] ]
+            Condition: 
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+  AWSCloudTrailBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+
+  AwsCloudTrail:
+    DependsOn:
+      - AWSCloudTrailBucketPolicy
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      S3BucketName: !Ref AWSCloudTrailBucket
+      EventSelectors:
+        - DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - Fn::Join:
+                    - ""
+                    - - Fn::ImportValue: !Sub ${BuildStack}:CICDBucketArn
+                      - "/"
+                      - "eks/express-minapp-deploy.zip"
+          ReadWriteType: WriteOnly
+      IncludeGlobalServiceEvents: true
+      IsLogging: true
+      IsMultiRegionTrail: true
+
   ###### CodeBuild ######
   CodeBuildProjectDeployExpressMiniapp:
     Type: AWS::CodeBuild::Project
@@ -112,7 +161,7 @@ Resources:
       Description: The CodeBuild project for deploying the express-miniapp project
       Environment:
         ComputeType: BUILD_GENERAL1_SMALL
-        Image: aws/codebuild/amazonlinux2-x86_64-standard:2.0
+        Image: aws/codebuild/standard:5.0
         Type: LINUX_CONTAINER
         PrivilegedMode: true
         EnvironmentVariables:

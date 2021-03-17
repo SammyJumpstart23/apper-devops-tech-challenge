@@ -384,6 +384,12 @@ Outputs:
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", "CICDBucket" ] ]
 
+  CICDBucketArn:
+    Description: Refers to the bucket ARN used for CI/CD pipeline
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", "CICDBucketArn" ] ]
+
   ExpressAppRepository:
     Description: Refers to the ECR used for the CI/CD pipeline
     Value: !Ref ExpressAppRepository
