@@ -8,7 +8,7 @@ Welcome to the repository for my submission to the Apper DevOps Engineer Technic
 | ---------- | ---------- | ------------ | ------------- |
 |      1     |      COMPLETE      |      03/03/2021      |      03/10/2021      |
 |      2     |      COMPLETE      |      03/09/2021      |      03/10/2021      |
-|      3     |      BACKLOG      |          -           |      -      |
+|      3     |      ONGOING      |     03/10/2021     |      -      |
 
 ## For Submission
 
