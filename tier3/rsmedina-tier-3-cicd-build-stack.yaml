@@ -351,7 +351,7 @@ Resources:
               Configuration:
                 BucketName: !Ref S3Bucket
                 Extract: false
-                ObjectKey: eks/manifest.zip
+                ObjectKey: eks/express-minapp-deploy.zip
               Name: Push-to-S3
               InputArtifacts:
                 - Name: built-express-miniapp

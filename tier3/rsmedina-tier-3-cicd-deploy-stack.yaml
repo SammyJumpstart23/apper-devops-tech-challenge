@@ -89,7 +89,7 @@ Resources:
               - Fn::ImportValue:
                   !Sub ${BuildStack}:CICDBucket
             key:
-              - "eks/manifest.zip"
+              - "eks/express-minapp-deploy.zip"
       Targets:
         - Arn: !Join [ '', [ 'arn:aws:codepipeline:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':', !Ref DeployCodePipeline ] ]
           RoleArn: !GetAtt S3WatchEventRole.Arn
@@ -195,7 +195,7 @@ Resources:
                 S3Bucket:
                   Fn::ImportValue:
                     !Sub ${BuildStack}:CICDBucket
-                S3ObjectKey: eks/manifest.zip
+                S3ObjectKey: eks/express-minapp-deploy.zip
                 PollForSourceChanges: false
               Name: S3-Source-for-Image-Definitions
               OutputArtifacts:

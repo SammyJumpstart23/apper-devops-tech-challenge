@@ -26,6 +26,7 @@ phases:
 
 artifacts:
   files:
-    - manifest.yaml
+    - express-minapp/manifest.yaml
+    - buildspec-3-deploy.yml
+  discard-paths: yes
   name: express-minapp
-  base-directory: express-minapp
