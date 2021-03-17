@@ -6,17 +6,16 @@ phases:
       nodejs: latest
     commands:
       - echo Installing app dependencies...
-      - curl -o kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" 
+      - curl -o kubectl https://amazon-eks.s3.us-west-2.amazonaws.com/1.18.9/2020-11-02/bin/linux/amd64/kubectl
       - chmod +x ./kubectl
       - mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
       - echo 'export PATH=$PATH:$HOME/bin' >> ~/.bashrc
-      - source ~/.bashrc
-      - kubectl version --short --client
   pre_build:
     commands:
       - echo Entered the pre_build phase...
       - echo Logging in to Amazon EKS...
       - aws eks --region $AWS_DEFAULT_REGION update-kubeconfig --name $AWS_CLUSTER_NAME --role-arn arn:aws:iam::485323199507:role/rsmedina-tier-3-cloudformation-role
+      - kubectl version --short --client
   build:
     commands:
       - echo Build started on `date`
