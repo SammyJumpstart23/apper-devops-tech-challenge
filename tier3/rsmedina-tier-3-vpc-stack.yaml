@@ -96,6 +96,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/elb
+          Value: 1
   Public2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -111,6 +113,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/elb
+          Value: 1
   Private1Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -126,6 +130,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
   Private2Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -141,6 +147,8 @@ Resources:
           Value: !Ref Environment
         - Key: PROJECT_NAME
           Value: !Ref ProjectName
+        - Key: kubernetes.io/role/internal-elb
+          Value: 1
   Database1Subnet:
     Type: AWS::EC2::Subnet
     Properties:

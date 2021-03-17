@@ -247,6 +247,18 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
         - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
         - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+      Policies:
+        - PolicyName: !Sub ${ProjectName}-tier-${ChallengeTier}-${Environment}-eks-ecr-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "ecr:BatchCheckLayerAvailability"
+                  - "ecr:BatchGetImage"
+                  - "ecr:GetDownloadUrlForLayer"
+                  - "ecr:GetAuthorizationToken"
+                Resource: "*"
+                Effect: Allow
       Tags:
         - Key: TIER
           Value: !Ref ChallengeTier
@@ -264,11 +276,6 @@ Resources:
       VpcId:
         Fn::ImportValue: !Sub "${VPCStack}:VPC"
       SecurityGroupIngress:
-        # - SourceSecurityGroupId: !GetAtt ExpressApplicationELBSecurityGroup.GroupId
-        #   Description: Allows public access to over port 1337 to the Apper DevOps Tech Challenge application
-        #   FromPort: 1337
-        #   ToPort: 1337
-        #   IpProtocol: tcp
         - SourceSecurityGroupId:
             Fn::ImportValue: !Sub "${RDSStack}:MasterDBSecurityGroup"
           Description: Allows access to the master DB instance
